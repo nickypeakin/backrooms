@@ -44,9 +44,11 @@ with a keyboard and mouse.
 
 - **Solo:** click **Play Solo**. Three bot coworkers fill the other spots, and
   the match runs in your own tab, so you don't need a fast connection.
-- **With friends:** one person clicks **Host a Game** and sends the 5-letter
-  code or the invite link. Friends type the code and click **Join**. Empty
-  spots can be filled with bots.
+- **With friends:** one person clicks **Host a Game** and sends the invite
+  link from the lobby screen (the **Copy** button). Friends open the link and
+  press **Join Game**; or they can open the game and type the 5-letter code.
+  Empty spots can be filled with bots. The host must stay on the lobby
+  screen until everyone is in, then click **Clock In**.
 
 There's no game server. The host's browser runs the match, and friends
 connect straight to it over WebRTC. The free [PeerJS](https://peerjs.com)
@@ -54,12 +56,15 @@ service is only used to find each other by lobby code. The host has to keep
 the game open while everyone plays. If a friend drops out mid-match, a bot
 takes over their character.
 
-While joining, the title screen says what it's doing (reaching the
-matchmaking server, finding the lobby, connecting to the host) and gives a
-reason if a step fails. Some school and work networks block these direct
-connections; the game then tries public relay servers, and if that fails
-too, switching either player to a different network (a phone hotspot works)
-usually fixes it.
+While joining, the screen says what it's doing (reaching the matchmaking
+server, finding the lobby, connecting to the host) and gives a reason if a
+step fails. If friends can't get in, have everyone press **Test Connection**
+on the main menu: it checks whether that computer's network allows online
+play. Some school and work networks block these connections; the game then
+tries public relay servers, and if that fails too, switching either player
+to a different network (a phone hotspot works) usually fixes it. Everyone
+needs the same version of the game: if the host's copy is newer, friends
+are told to refresh.
 
 ## Publishing to GitHub Pages (one-time setup)
 

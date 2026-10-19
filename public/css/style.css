@@ -67,10 +67,18 @@ canvas#gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block
 /* -------------------------------------------------------------- screens -- */
 #screens { position: fixed; inset: 0; pointer-events: none; }
 .screen {
-  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center;
+  /* centred when there's room, scrollable from the top when there isn't */
+  justify-content: center; justify-content: safe center;
   pointer-events: auto; padding: 24px 16px; overflow-y: auto; background: radial-gradient(ellipse at center, rgba(0, 0, 0, 0.15), rgba(0, 0, 0, 0.6));
 }
 .screen.see-through { background: rgba(0, 0, 0, 0.25); }
+@media (max-height: 640px) {
+  .fine { display: none; }
+  .code { font-size: 52px; }
+  .head { font-size: 42px; margin-bottom: 6px; }
+  #slots li, #resultList li { padding: 3px 12px; margin-bottom: 4px; }
+}
 
 .logo { text-align: center; margin-bottom: 18px; }
 .logo h1 { margin: 0; font-size: clamp(56px, 11vw, 132px); font-weight: normal; letter-spacing: 8px; line-height: 0.9; color: var(--ink);
@@ -105,6 +113,14 @@ input:focus { outline: none; border-color: var(--yellow); }
 
 .head { margin: 0 0 12px; font-size: 56px; font-weight: normal; letter-spacing: 6px; }
 .code { font-size: 72px; letter-spacing: 16px; color: var(--yellow); }
+.sub { margin: 0 0 14px; font-size: 28px; color: var(--ink); text-align: center; }
+button.big { font-size: 40px; padding: 14px 16px; border-color: var(--yellow); background: rgba(226, 207, 115, 0.18); }
+.invitebox { width: min(560px, 100%); background: var(--panel); border: 1px solid var(--edge); padding: 10px 14px; margin-top: 8px; font-size: 22px; }
+.invitebox p { margin: 0 0 8px; }
+.invitebox .hint { margin: 8px 0 0; font-size: 19px; color: var(--dim); }
+.invitebox .join input { font-size: 18px; letter-spacing: 0; text-align: left; text-transform: none; }
+.msg.good { color: #9fe39a; }
+.msg.bad { color: #ff8a7a; }
 #slots, #resultList { list-style: none; padding: 0; margin: 14px 0; width: min(460px, 100%); }
 #resultList { width: min(640px, 100%); }
 #resultList li span:first-child { white-space: nowrap; }

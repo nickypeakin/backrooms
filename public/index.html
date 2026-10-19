@@ -48,6 +48,7 @@
         <label class="field">YOUR NAME <input id="name" maxlength="16" autocomplete="off" spellcheck="false"></label>
         <button data-act="solo">PLAY SOLO <small>with three bot coworkers</small></button>
         <button data-act="host">HOST A GAME <small>play with up to 3 friends</small></button>
+        <label class="field">GOT A CODE FROM A FRIEND?</label>
         <div class="join">
           <input id="code" maxlength="5" placeholder="CODE" autocomplete="off" spellcheck="false">
           <button data-act="join">JOIN</button>
@@ -55,17 +56,38 @@
         <div class="row">
           <button class="small" data-act="help">HOW TO PLAY</button>
           <button class="small" data-act="settings">SETTINGS</button>
+          <button class="small" data-act="nettest">TEST CONNECTION</button>
         </div>
         <p id="titleMsg" class="msg"></p>
       </div>
       <p class="fine">Fan-made. Inspired by the Backrooms creepypasta and found-footage films. Everything you see and hear is generated in code.</p>
     </section>
 
+    <section id="invite" class="screen" hidden>
+      <h2 class="head">YOU'RE INVITED</h2>
+      <p class="sub" id="inviteWho"></p>
+      <div class="menu">
+        <label class="field">YOUR NAME <input id="inviteName" maxlength="16" autocomplete="off" spellcheck="false"></label>
+        <button data-act="inviteJoin" id="inviteBtn" class="big">JOIN GAME</button>
+        <div class="row">
+          <button class="small" data-act="nettest">TEST CONNECTION</button>
+          <button class="small" data-act="leave">MAIN MENU</button>
+        </div>
+        <p id="inviteMsg" class="msg"></p>
+      </div>
+    </section>
+
     <section id="lobby" class="screen" hidden>
       <h2 class="head">LOBBY</h2>
       <div id="lobbyCode" class="code"></div>
-      <div class="row center">
-        <button class="small" data-act="copy">COPY INVITE LINK</button>
+      <div id="inviteBox" class="invitebox" hidden>
+        <p>Send your friends this link. It takes them straight to your lobby:</p>
+        <div class="join">
+          <input id="inviteLink" readonly>
+          <button class="small" data-act="copy">COPY</button>
+          <button class="small" data-act="share" id="shareBtn" hidden>SHARE</button>
+        </div>
+        <p class="hint">Or they can open the game and type the code. Keep this tab open while you play: your browser is the game's server.</p>
       </div>
       <p id="lobbyMsg" class="msg"></p>
       <ol id="slots"></ol>

@@ -4,11 +4,11 @@
 // free PeerJS service is only used to find each other by lobby code.
 
 import { Lobby } from '../host/lobby.js';
-import { PEER_PREFIX } from '../shared/config.js';
+import { PEER_PREFIX, PROTOCOL } from '../shared/config.js';
 
 const SERVER_TIMEOUT = 12000;    // to reach the matchmaking server
 const JOIN_TIMEOUT = 25000;      // from finding the lobby to being in it
-const SILENCE = 12000;           // pings flow every 2 s, so this means they're gone
+const SILENCE = 20000;           // pings flow every 2 s, so this means they're gone
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
 
 // Where two browsers find a route to each other. STUN works on most home
@@ -50,9 +50,10 @@ function peerOptions() {
   return opts;
 }
 
-// Browsers slow timers in background tabs to about once a second, which
-// would stall the match for everyone if the host switched tabs. Timers in a
-// worker keep their pace, so the host's match clock ticks from one.
+// Browsers slow timers in background tabs (down to once a minute after a
+// while), which would stall the match or drop friends when someone switches
+// tabs to send the invite link. Timers in a worker keep their pace, so the
+// match clock and the keep-alive pings tick from one.
 function workerTicker(fn, ms) {
   try {
     const url = URL.createObjectURL(new Blob([`setInterval(() => postMessage(0), ${ms});`], { type: 'text/javascript' }));
@@ -112,8 +113,8 @@ export class HostLink extends Emitter {
         await this.listen(Peer, code);
         this.lobby.code = code;
         this.lobby.sendLobby();
-        this.status('Lobby is open. Send your friends the code or the invite link.');
-        this.pinger = setInterval(() => this.heartbeat(), 2000);
+        this.status('Lobby is open. Send your friends the invite link.');
+        this.stopPinger = workerTicker(() => this.heartbeat(), 2000);
         return;
       } catch (e) {
         if (e && e.type === 'unavailable-id') continue;
@@ -159,6 +160,11 @@ export class HostLink extends Emitter {
       if (!msg || typeof msg !== 'object') return;
       if (g.id == null) {
         if (msg.t !== 'hello') return;
+        if (msg.v !== PROTOCOL) {
+          conn.send({ t: 'refused', text: "Your copy of the game is a different version from the host's. Both of you: refresh the page (Ctrl+Shift+R, or Cmd+Shift+R on a Mac) and try again." });
+          setTimeout(drop, 1000);
+          return;
+        }
         g.id = this.lobby.add(msg.name, (m) => { if (conn.open) conn.send(m); });
         if (!g.id) setTimeout(drop, 1000);
         else this.status('A friend joined. Clock in when everyone is here.');
@@ -180,7 +186,7 @@ export class HostLink extends Emitter {
 
   close() {
     this.closed = true;
-    clearInterval(this.pinger);
+    if (this.stopPinger) this.stopPinger();
     this.lobby.close();
     for (const g of this.guests) try { g.conn.close(); } catch { /* gone */ }
     if (this.peer) this.peer.destroy();
@@ -234,8 +240,8 @@ export class GuestLink extends Emitter {
             stage = 'hello';
             this.status('Connected. Joining the lobby...');
             this.last = performance.now();
-            conn.send({ t: 'hello', name: this.name });
-            this.pinger = setInterval(() => {
+            conn.send({ t: 'hello', name: this.name, v: PROTOCOL });
+            this.stopPinger = workerTicker(() => {
               if (performance.now() - this.last > SILENCE) this.lost();
               else if (conn.open) conn.send({ t: 'ping' });
             }, 2000);
@@ -265,8 +271,43 @@ export class GuestLink extends Emitter {
 
   close() {
     this.closed = true;
-    clearInterval(this.pinger);
+    if (this.stopPinger) this.stopPinger();
     try { if (this.conn) this.conn.close(); } catch { /* gone */ }
     if (this.peer) this.peer.destroy();
   }
+}
+
+// ------------------------------------------------------- connection test --
+// Can this computer play online? Checks the matchmaking server, then asks
+// the STUN and TURN servers how the network looks from outside:
+//   host candidates only   -> the network blocks peer-to-peer traffic
+//   srflx (public address) -> direct connections work with most friends
+//   relay                  -> a relay is reachable, so it works almost anywhere
+export async function testConnection() {
+  const out = { webrtc: typeof RTCPeerConnection !== 'undefined', server: false, direct: false, relay: false };
+  if (!out.webrtc) return out;
+  try {
+    const Peer = await loadPeer();
+    out.server = await new Promise((resolve) => {
+      const peer = new Peer(peerOptions());
+      const done = (ok) => { clearTimeout(timer); peer.destroy(); resolve(ok); };
+      const timer = setTimeout(() => done(false), SERVER_TIMEOUT);
+      peer.on('open', () => done(true));
+      peer.on('error', () => done(false));
+    });
+  } catch { out.server = false; }
+  const pc = new RTCPeerConnection({ iceServers: ICE_SERVERS });
+  pc.createDataChannel('test');
+  await new Promise((resolve) => {
+    const timer = setTimeout(resolve, 9000);
+    pc.onicecandidate = (e) => {
+      if (!e.candidate) { clearTimeout(timer); resolve(); return; }
+      const type = (/ typ (\w+)/.exec(e.candidate.candidate) || [])[1];
+      if (type === 'srflx' || type === 'prflx') out.direct = true;
+      if (type === 'relay') out.relay = true;
+    };
+    pc.createOffer().then((o) => pc.setLocalDescription(o)).catch(resolve);
+  });
+  pc.close();
+  return out;
 }

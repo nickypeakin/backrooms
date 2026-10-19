@@ -2,6 +2,8 @@
 
 export const MAX_PLAYERS = 4;
 export const PEER_PREFIX = 'bdb-backrooms-noclip-';
+// bump whenever host and guest messages change: mismatched copies refuse to mix
+export const PROTOCOL = 3;
 
 // people
 export const PLAYER_R = 0.3;

@@ -5,7 +5,7 @@ import * as THREE from 'three';
 import { VHS } from './client/vhs.js';
 import { Input } from './client/input.js';
 import { Hud, showScreen, screenShown, renderLobby, renderResults, setMsg } from './client/ui.js';
-import { HostLink, GuestLink } from './client/net.js';
+import { HostLink, GuestLink, testConnection } from './client/net.js';
 import { Game } from './client/game.js';
 import { Attract } from './client/attract.js';
 import { sound } from './client/audio.js';
@@ -47,7 +47,8 @@ $('invert').addEventListener('change', (e) => { settings.invert = e.target.check
 $('look').checked = settings.look;
 $('look').addEventListener('change', (e) => { settings.look = e.target.checked; vhs.look = settings.look ? 1 : 0; save(); });
 
-if (params.get('join')) $('code').value = params.get('join').toUpperCase().slice(0, 5);
+const invited = (params.get('join') || '').toUpperCase().replace(/[^A-Z]/g, '').slice(0, 5);
+if (invited) $('code').value = invited;
 document.fonts?.load('40px VT323').catch(() => {});
 
 // ---------------------------------------------------------------- state --
@@ -115,8 +116,9 @@ function wire(l) {
     if (l !== link || game || solo) return;
     showScreen('lobby');
     renderLobby(m, l.id);
+    showInvite(m);
   });
-  l.on('status', (m) => { if (l === link && !game) setMsg(l.isHost ? 'lobbyMsg' : 'titleMsg', m.text); });
+  l.on('status', (m) => { if (l === link && !game) setMsg(l.isHost ? 'lobbyMsg' : guestMsgId(), m.text); });
   l.on('start', (m) => { if (l === link) startGame(m); });
   l.on('over', (m) => { if (l === link) endGame(m.results); });
   l.on('closed', (m) => { if (l === link) { leave(); setMsg('titleMsg', m.text); } });
@@ -140,27 +142,52 @@ const actions = {
   },
   join() {
     const code = $('code').value.toUpperCase().replace(/[^A-Z]/g, '');
-    if (code.length !== 5) { setMsg('titleMsg', 'Lobby codes are 5 letters.'); return; }
+    if (code.length !== 5) { setMsg('titleMsg', 'Lobby codes are 5 letters.', 'bad'); return; }
     begin();
     solo = false;
+    const btn = $('inviteBtn');
+    const msgId = guestMsgId();
     const l = (link = new GuestLink(playerName(), code));
     wire(l);
-    l.connect().then(() => setMsg('titleMsg', '')).catch((e) => {
+    btn.disabled = true;
+    btn.textContent = 'JOINING...';
+    l.connect().then(() => setMsg(msgId, '')).catch((e) => {
       if (link === l) link = null;
-      setMsg('titleMsg', e.message);
+      setMsg(msgId, e.message, 'bad');
+    }).finally(() => {
+      btn.disabled = false;
+      btn.textContent = 'TRY AGAIN';
     });
+  },
+  // from an invite link: one button, straight into the friend's lobby
+  inviteJoin() {
+    $('name').value = $('inviteName').value;
+    $('code').value = invited;
+    actions.join();
+  },
+  async nettest() {
+    const id = screenShown('invite') ? 'inviteMsg' : 'titleMsg';
+    setMsg(id, 'Testing your connection (this takes about 10 seconds)...');
+    const r = await testConnection();
+    if (!r.webrtc) setMsg(id, "This browser can't do online play. Try Chrome, Edge or Firefox.", 'bad');
+    else if (!r.server) setMsg(id, "Can't reach the matchmaking server (0.peerjs.com). This network, an ad blocker or a school/work filter is blocking it. Try another network or a phone hotspot.", 'bad');
+    else if (r.relay) setMsg(id, 'Online play should work on this network.', 'good');
+    else if (r.direct) setMsg(id, "Online play should work with most friends. If it doesn't, one of you is probably on a school or work network: try a phone hotspot.", 'good');
+    else setMsg(id, 'This network blocks the connections online play needs (common on school and work Wi-Fi). Try a different network or a phone hotspot.', 'bad');
   },
   help() { backTo = currentScreen(); showScreen('help'); },
   settings() { backTo = currentScreen(); showScreen('settings'); },
   back() { showScreen(backTo); },
   copy() {
-    const code = $('lobbyCode').textContent;
-    if (!/^[A-Z]{5}$/.test(code)) return;
-    const url = `${location.origin}${location.pathname}?join=${code}`;
-    navigator.clipboard?.writeText(url).then(
-      () => setMsg('lobbyMsg', 'Invite link copied. Send it to your friends.'),
-      () => setMsg('lobbyMsg', url),
-    );
+    const url = $('inviteLink').value;
+    if (!url) return;
+    $('inviteLink').select();
+    const done = () => setMsg('lobbyMsg', 'Invite link copied. Paste it to your friends.', 'good');
+    if (navigator.clipboard) navigator.clipboard.writeText(url).then(done, () => document.execCommand('copy') && done());
+    else if (document.execCommand('copy')) done();
+  },
+  share() {
+    navigator.share?.({ title: 'The Backrooms: Closing Time', text: 'Join my game!', url: $('inviteLink').value }).catch(() => {});
   },
   start() { link?.send({ t: 'start', fill: $('fill').checked }); },
   again() { link?.send({ t: 'start' }); },
@@ -174,6 +201,22 @@ const actions = {
     setPaused(false);
   },
 };
+
+function guestMsgId() {
+  return screenShown('invite') ? 'inviteMsg' : 'titleMsg';
+}
+
+// the invite link (and code) everyone in the lobby can pass on
+function showInvite(m) {
+  $('inviteBox').hidden = !m.code;
+  if (!m.code) return;
+  const host = m.players.find((p) => p.id === m.hostId);
+  const url = new URL(location.pathname, location.origin);
+  url.searchParams.set('join', m.code);
+  if (host) url.searchParams.set('from', host.name);
+  $('inviteLink').value = url.href;
+  $('shareBtn').hidden = !navigator.share;
+}
 
 function currentScreen() {
   for (const id of ['title', 'lobby', 'pause', 'results']) if (screenShown(id)) return id;
@@ -222,6 +265,7 @@ function leave() {
   if (link) link.close();
   link = null;
   solo = false;
+  if (invited && screenShown('invite')) history.replaceState(null, '', location.pathname);
   if (game) disposeGame();
   setPaused(false);
   input.unlock();
@@ -266,4 +310,10 @@ function frame(now) {
 }
 requestAnimationFrame(frame);
 
-showScreen('title');
+if (invited) {
+  const from = (params.get('from') || '').slice(0, 16);
+  $('inviteWho').textContent = `${from ? `${from}'s` : "A friend's"} game \u00b7 lobby ${invited}`;
+  $('inviteName').value = $('name').value;
+  $('inviteName').addEventListener('keydown', (e) => { if (e.key === 'Enter') actions.inviteJoin(); });
+  showScreen('invite');
+} else showScreen('title');

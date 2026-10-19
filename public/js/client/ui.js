@@ -145,6 +145,9 @@ export function renderResults(results, myId, amHost) {
   $('resultWait').textContent = amHost ? '' : 'Waiting for the host...';
 }
 
-export function setMsg(id, text) {
-  $(id).textContent = text || '';
+// cls: 'good' or 'bad' to colour the message
+export function setMsg(id, text, cls = '') {
+  const el = $(id);
+  el.textContent = text || '';
+  el.className = `msg ${cls}`.trim();
 }
