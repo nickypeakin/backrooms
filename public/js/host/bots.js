@@ -1,16 +1,12 @@
-// Coworkers played by the computer. In the store they browse the displays on
-// their way to the stockroom; once someone falls through the wall they go in
-// after them. In Level 0 they stick close to the nearest person and run from
-// the entity. Runs on the host only.
+// Coworkers played by the computer. In Level 0 they stick close to the
+// nearest person, run from the entity, and head for the door once there is
+// nobody left to follow. Runs on the host only.
 
-import { BROWSE, COLLIDERS } from '../shared/store.js';
 import { PLAYER_R } from '../shared/config.js';
-import { stepTowards, walkTo, fleeTarget, turn, yawTowards } from './nav.js';
+import { walkTo, fleeTarget, turn, yawTowards } from './nav.js';
 
 const LINES = {
-  witness: ['Whoa! Where did they go?!', 'Did they just... fall through the wall?', 'Hello?! Can you hear me?', 'That wall just swallowed them.'],
-  follow: ["I'm going in after them.", "We can't just leave them in there.", 'Okay... okay. Here goes nothing.'],
-  arrive: ['Where... are we?', "This isn't the stockroom.", 'Do you hear that humming?', 'It smells like wet carpet.', 'How far does this go?'],
+  arrive: ['Do you hear that humming?', 'It smells like wet carpet.', 'How far does this go?', 'Stay close, okay?'],
   roar: ['What was that?!', 'RUN!', "Something's in here with us!", "Don't stop moving!"],
   alone: ['Hello? Anyone?', 'Wait up!', 'Where is everyone?'],
 };
@@ -21,65 +17,6 @@ export function say(m, p, kind) {
   b.quietUntil = m.t + 12;
   m.chatter = m.t + 2.5;
   m.emit({ t: 'say', id: p.id, text: m.rng.pick(LINES[kind]) });
-}
-
-function initBrain(m, p) {
-  const browse = m.rng.pick(BROWSE);
-  return {
-    mode: 'browse',
-    wps: [{ x: Math.sign(browse.x) * 1.3, z: p.z - 0.4 }, { x: browse.x, z: browse.z }],
-    look: browse.ry,
-    wait: m.rng.range(4, 11),
-  };
-}
-
-function followWps(p, b, speed, dt) {
-  const wp = b.wps[0];
-  if (!wp) { p.moving = false; return true; }
-  const left = stepTowards(p, wp.x, wp.z, speed, dt, PLAYER_R, COLLIDERS);
-  if (left < 0.25) b.wps.shift();
-  return b.wps.length === 0;
-}
-
-function storeBot(m, p, b, dt) {
-  if (m.slip && b.mode !== 'react' && b.mode !== 'toHole') {
-    b.mode = 'react';
-    b.wait = m.rng.range(1.2, 3.2);
-    if (!m.witnessed) { m.witnessed = true; say(m, p, 'witness'); }
-  }
-  p.mv = 0;
-  switch (b.mode) {
-    case 'browse':
-      p.mv = 1;
-      if (followWps(p, b, 2.3, dt)) b.mode = 'look';
-      break;
-    case 'look':
-      p.ry = turn(p.ry, b.look, 3 * dt);
-      if ((b.wait -= dt) <= 0) {
-        b.mode = 'toBack';
-        b.wps = [{ x: 0, z: p.z }, { x: 0, z: -9.3 }, { x: 0, z: -12.8 }, { x: -0.1, z: -16.4 }];
-      }
-      break;
-    case 'toBack':
-      p.mv = 1;
-      followWps(p, b, 2.3, dt);
-      break;
-    case 'react':
-      // stare towards the back hallway for a moment, then go after them
-      p.ry = turn(p.ry, yawTowards(-1.3 - p.x, -16.5 - p.z), 4 * dt);
-      if ((b.wait -= dt) <= 0) {
-        b.mode = 'toHole';
-        b.wps = [];
-        if (p.z > -9.6) b.wps.push({ x: 0, z: Math.min(p.z, 8) }, { x: 0, z: -9.3 });
-        b.wps.push({ x: 0, z: -13.6 }, { x: -0.7, z: -16.5 }, { x: -2, z: -16.5 });
-        if (m.rng.chance(0.5)) say(m, p, 'follow');
-      }
-      break;
-    case 'toHole':
-      p.mv = 2;
-      followWps(p, b, 3.6, dt);
-      break;
-  }
 }
 
 function leaderFor(m, p) {
@@ -139,11 +76,10 @@ function level0Bot(m, p, b, dt) {
     return;
   }
 
-  // nobody to follow yet: mill about where we landed
+  // nobody to follow: mill about where we landed
   b.wanderT = (b.wanderT || 0) - dt;
   if (!b.wander || b.wanderT <= 0) {
-    const a = L.arrivalPoint(m.rng);
-    b.wander = a;
+    b.wander = { x: L.centerX(L.spawn) + m.rng.range(-3, 3), z: L.centerZ(L.spawn) + m.rng.range(-3, 3) };
     b.wanderT = m.rng.range(3, 7);
   }
   const left = walkTo(L, p, b.wander.x, b.wander.z, 1.6, dt, PLAYER_R);
@@ -151,7 +87,6 @@ function level0Bot(m, p, b, dt) {
 }
 
 export function updateBot(m, p, dt) {
-  const b = p.brain || (p.brain = initBrain(m, p));
-  if (p.lv === 'store') storeBot(m, p, b, dt);
-  else if (p.lv === 'l0') level0Bot(m, p, b, dt);
+  const b = p.brain || (p.brain = {});
+  if (p.lv === 'l0') level0Bot(m, p, b, dt);
 }

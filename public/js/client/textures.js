@@ -6,18 +6,23 @@ import { makeRng } from '../shared/rng.js';
 
 const cache = new Map();
 
+// Textures are painted in "design" pixels and stored at twice that size so
+// they stay sharp up close.
+const SCALE = 2;
 function canvas(w, h) {
   const c = document.createElement('canvas');
-  c.width = w;
-  c.height = h;
-  return [c, c.getContext('2d')];
+  c.width = w * SCALE;
+  c.height = h * SCALE;
+  const x = c.getContext('2d');
+  x.scale(SCALE, SCALE);
+  return [c, x];
 }
 
 function toTexture(c, { repeat = true, srgb = true } = {}) {
   const t = new THREE.CanvasTexture(c);
   if (repeat) t.wrapS = t.wrapT = THREE.RepeatWrapping;
   if (srgb) t.colorSpace = THREE.SRGBColorSpace;
-  t.anisotropy = 4;
+  t.anisotropy = 8;
   return t;
 }
 
@@ -28,7 +33,7 @@ function cached(key, make) {
 
 // per-pixel brightness noise
 function grain(ctx, w, h, amount, rng) {
-  const img = ctx.getImageData(0, 0, w, h);
+  const img = ctx.getImageData(0, 0, ctx.canvas.width, ctx.canvas.height);
   const d = img.data;
   for (let i = 0; i < d.length; i += 4) {
     const n = (rng() - 0.5) * amount;
@@ -90,10 +95,10 @@ export const carpet = () => cached('carpet', () => {
   return toTexture(c);
 });
 
-export const ceilingTile = () => cached('ceilingTile', () => {
-  const S = 256, rng = makeRng('ceiling');
+export const ceilingTile = (tint = '#d9d2b0', key = 'ceilingTile') => cached(key, () => {
+  const S = 256, rng = makeRng(key);
   const [c, x] = canvas(S, S);
-  x.fillStyle = '#d9d2b0';
+  x.fillStyle = tint;
   x.fillRect(0, 0, S, S);
   for (let k = 0; k < 2600; k++) {
     x.fillStyle = `rgba(90,80,50,${0.12 + rng() * 0.2})`;
@@ -295,6 +300,32 @@ export const puddle = () => cached('puddle', () => {
   x.filter = 'blur(6px)';
   x.fill();
   return toTexture(c, { repeat: false, srgb: false });
+});
+
+// an abstract print for the store walls
+export const painting = (seed) => cached(`painting${seed}`, () => {
+  const W = 256, H = 192, rng = makeRng(`painting${seed}`);
+  const [c, x] = canvas(W, H);
+  const palettes = [
+    ['#e9e1cf', '#c96a3d', '#2f4858', '#d9a441', '#8aa39b'],
+    ['#f1ece2', '#3d5a80', '#98c1d9', '#ee6c4d', '#293241'],
+    ['#efe6d8', '#6b705c', '#a5a58d', '#cb997e', '#3f4238'],
+  ];
+  const pal = palettes[seed % palettes.length];
+  x.fillStyle = pal[0];
+  x.fillRect(0, 0, W, H);
+  for (let k = 0; k < 7; k++) {
+    x.fillStyle = pal[1 + Math.floor(rng() * (pal.length - 1))];
+    x.globalAlpha = 0.65 + rng() * 0.35;
+    if (rng() < 0.5) {
+      x.beginPath();
+      x.arc(rng() * W, rng() * H, 18 + rng() * 60, 0, Math.PI * 2);
+      x.fill();
+    } else x.fillRect(rng() * W * 0.8, rng() * H * 0.8, 30 + rng() * 120, 14 + rng() * 80);
+  }
+  x.globalAlpha = 1;
+  grain(x, W, H, 10, rng);
+  return toTexture(c, { repeat: false });
 });
 
 export const almondLabel = () => cached('almondLabel', () => {

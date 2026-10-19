@@ -199,7 +199,8 @@ export class Level0View {
     common.exitPos.value.set(ex.x + ex.nx * 0.4, 2.3, ex.z + ex.nz * 0.4);
 
     // standard-material objects (people, bottles, the door) get plain lights
-    s.add(new THREE.AmbientLight(0xffeebb, 2.4));
+    s.add(new THREE.AmbientLight(0xffeebb, 1.1));
+    s.add(new THREE.HemisphereLight(0xfff2c4, 0x6b5a2a, 2.2));
     this.flashlight = new THREE.SpotLight(0xfff4e0, 0, 22, 0.5, 0.5, 1.4);
     s.add(this.flashlight);
     s.add(this.flashlight.target);

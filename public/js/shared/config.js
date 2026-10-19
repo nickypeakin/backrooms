@@ -50,6 +50,9 @@ export const ENTITY = {
 export const STORE_H = 3.6;
 export const HALL_H = 2.8;
 
+// the opening cutscene: closing time, the slip, following through the wall
+export const INTRO_LEN = 34;
+
 // simulation
 export const TICK = 1 / 20;
 export const SNAP_EVERY = 3;        // ticks between snapshots (about 15 Hz)

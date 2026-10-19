@@ -23,6 +23,12 @@ export class Hud {
   show() { this.root.hidden = false; this.banner(null); }
   hide() { this.root.hidden = true; }
 
+  get mapCanvas() { return $('minimap'); }
+  showMap(on) { $('minimap').hidden = !on; }
+
+  // cutscenes show only subtitles, the title card and the skip hint
+  cinematic(on) { this.root.classList.toggle('cinematic', on); }
+
   set(id, text) {
     if (this.last[id] === text) return;
     this.last[id] = text;
@@ -56,8 +62,8 @@ export class Hud {
     d.innerHTML = `<b>${esc(name)}:</b> ${esc(text)}`;
     const box = $('subs');
     box.appendChild(d);
-    while (box.children.length > 3) box.firstChild.remove();
-    setTimeout(() => d.remove(), 5000);
+    while (box.children.length > 2) box.firstChild.remove();
+    setTimeout(() => d.remove(), 4500);
   }
 
   toast(text) {
@@ -88,6 +94,8 @@ export class Hud {
 
   reset() {
     this.last = {};
+    this.cinematic(false);
+    this.showMap(false);
     for (const id of ['objective', 'prompt', 'almond']) $(id).textContent = '';
     $('subs').innerHTML = '';
     $('toasts').innerHTML = '';

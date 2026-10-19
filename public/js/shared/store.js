@@ -1,9 +1,8 @@
-// The furniture store where every match starts: a showroom full of display
-// rooms, and a back hallway to the stockroom with a wet floor nobody mopped.
-// Front of the store is +z, the hallway runs off the back wall towards -z.
-// Furniture is modelled facing +z; `rot` turns it about the vertical axis.
-
-import { box } from './collision.js';
+// The furniture store where every match starts (the opening cutscene plays
+// out here): a showroom full of display rooms, and a back hallway to the
+// stockroom with a wet floor nobody mopped. Front of the store is +z, the
+// hallway runs off the back wall towards -z. Furniture is modelled facing
+// +z; `rot` turns it about the vertical axis.
 
 export const SHOWROOM = { x0: -14, x1: 14, z0: -10, z1: 10 };
 export const HALL = { x0: -1.3, x1: 1.3, z0: -22, z1: -10 };
@@ -13,8 +12,8 @@ export const SPAWNS = [
   { x: -3, z: 7.4 }, { x: -1, z: 8.2 }, { x: 1, z: 8.2 }, { x: 3, z: 7.4 },
 ];
 
-// slipping happens on the puddle; the slipper goes through the west wall
-export const SPILL = { x0: -1.3, x1: 1.3, z0: -17.4, z1: -15.6, cx: -0.25, cz: -16.5 };
+// the puddle, and the stretch of hallway wall that stops being solid
+export const SPILL = { cx: -0.25, cz: -16.5 };
 export const HOLE = { x: -1.3, z: -16.5, z0: -17.25, z1: -15.75, h: 2.1 };
 
 export const FURNITURE = [
@@ -73,59 +72,24 @@ export const FURNITURE = [
   { type: 'bookshelf', x: 5.6, z: -9.6 },
   { type: 'plant', x: -3.0, z: -9.4 },
   { type: 'plant', x: 3.0, z: -9.4 },
+  // decor
+  { type: 'art', x: -14, z: 6.2, rot: Math.PI / 2, y: 1.75, w: 1.3, h: 0.95, seed: 0 },
+  { type: 'art', x: -14, z: -6.8, rot: Math.PI / 2, y: 1.75, w: 1.0, h: 1.3, seed: 1 },
+  { type: 'art', x: 14, z: 2.6, rot: -Math.PI / 2, y: 1.75, w: 1.4, h: 1.0, seed: 2 },
+  { type: 'art', x: -8, z: -10, y: 1.95, w: 1.6, h: 0.9, seed: 3 },
+  { type: 'art', x: 9.2, z: -10, y: 1.85, w: 1.1, h: 1.1, seed: 4 },
+  { type: 'pendant', x: -8.45, z: -6.8, h: 3.6 },
+  { type: 'pendant', x: -7.55, z: -6.8, h: 3.6 },
+  { type: 'deptSign', x: -4.6, z: 5.6, rot: Math.PI / 2, h: 3.6, text: 'LIVING ROOM' },
+  { type: 'deptSign', x: -4.6, z: -0.7, rot: Math.PI / 2, h: 3.6, text: 'BEDROOMS' },
+  { type: 'deptSign', x: -4.6, z: -6.8, rot: Math.PI / 2, h: 3.6, text: 'DINING' },
+  { type: 'deptSign', x: 4.6, z: 5.4, rot: -Math.PI / 2, h: 3.6, text: 'SECTIONALS' },
+  { type: 'deptSign', x: 4.6, z: 0.5, rot: -Math.PI / 2, h: 3.6, text: 'HOME OFFICE' },
+  { type: 'deptSign', x: 4.6, z: -6.3, rot: -Math.PI / 2, h: 3.6, text: 'BEDROOMS' },
+  { type: 'plant', x: 12.9, z: 8.8 },
+  { type: 'plant', x: -12.9, z: -9.3 },
   // the hallway
   { type: 'wetSign', x: 0.8, z: -15.0, rot: -0.4 },
   { type: 'boxes', x: 0.85, z: -20.6 },
   { type: 'boxes', x: -0.85, z: -12.2, rot: 0.3 },
 ];
-
-// footprint (width along x, depth along z) of each furniture type at rot 0
-export const FOOTPRINT = {
-  sofa: [2.3, 0.95], armchair: [1.0, 0.95], coffeeTable: [1.2, 0.65], floorLamp: [0.4, 0.4],
-  tvStand: [1.8, 0.45], plant: [0.55, 0.55], bed: [1.75, 2.15], nightstand: [0.5, 0.45],
-  dresser: [1.4, 0.5], diningTable: [1.8, 0.95], chair: [0.48, 0.48], sideboard: [2.0, 0.48],
-  counter: [3.6, 0.9], desk: [1.4, 0.7], officeChair: [0.6, 0.6], bookshelf: [1.0, 0.36],
-  wardrobe: [1.6, 0.6], wetSign: [0.5, 0.38], boxes: [0.7, 0.7],
-};
-
-export function footprint(f) {
-  const fp = FOOTPRINT[f.type];
-  if (!fp) return null;
-  const quarter = Math.round(Math.abs(f.rot || 0) / (Math.PI / 2)) % 2 === 1;
-  const [w, d] = quarter ? [fp[1], fp[0]] : fp;
-  return box(f.x, f.z, w, d);
-}
-
-const T = 0.3;
-export const WALLS = [
-  { x0: SHOWROOM.x0 - T, x1: SHOWROOM.x0, z0: SHOWROOM.z0 - T, z1: SHOWROOM.z1 + T },
-  { x0: SHOWROOM.x1, x1: SHOWROOM.x1 + T, z0: SHOWROOM.z0 - T, z1: SHOWROOM.z1 + T },
-  { x0: SHOWROOM.x0 - T, x1: SHOWROOM.x1 + T, z0: SHOWROOM.z1, z1: SHOWROOM.z1 + T },
-  { x0: SHOWROOM.x0 - T, x1: BACK_DOOR.x0, z0: SHOWROOM.z0 - T, z1: SHOWROOM.z0 },
-  { x0: BACK_DOOR.x1, x1: SHOWROOM.x1 + T, z0: SHOWROOM.z0 - T, z1: SHOWROOM.z0 },
-  { x0: HALL.x0 - T, x1: HALL.x0, z0: HALL.z0 - T, z1: SHOWROOM.z0 },
-  { x0: HALL.x1, x1: HALL.x1 + T, z0: HALL.z0 - T, z1: SHOWROOM.z0 },
-  { x0: HALL.x0 - T, x1: HALL.x1 + T, z0: HALL.z0 - T, z1: HALL.z0 },
-];
-
-// rugs and price tags are flat: you walk over them
-export const COLLIDERS = [
-  ...WALLS,
-  ...FURNITURE.filter((f) => f.type !== 'rug' && f.type !== 'price').map(footprint).filter(Boolean),
-];
-
-// where bots stop to look at the displays, and which way they look
-export const BROWSE = [
-  { x: -2.8, z: 5.6, ry: Math.PI / 2 }, { x: -2.8, z: -0.8, ry: Math.PI / 2 },
-  { x: -2.8, z: -6.8, ry: Math.PI / 2 }, { x: 2.8, z: 5.4, ry: -Math.PI / 2 },
-  { x: 2.8, z: 0.4, ry: -Math.PI / 2 }, { x: 2.8, z: -6.3, ry: -Math.PI / 2 },
-];
-
-export function inSpill(x, z) {
-  return x > SPILL.x0 && x < SPILL.x1 && z > SPILL.z0 && z < SPILL.z1;
-}
-
-// is someone at (x, z) with radius r pressed against the glitching wall?
-export function touchingHole(x, z, r) {
-  return x - r < HOLE.x + 0.06 && z > HOLE.z0 && z < HOLE.z1 && x < HOLE.x + 1;
-}

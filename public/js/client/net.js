@@ -6,9 +6,23 @@
 import { Lobby } from '../host/lobby.js';
 import { PEER_PREFIX } from '../shared/config.js';
 
-const JOIN_TIMEOUT = 20000;
-const SILENCE = 12000;          // pings flow every 2 s, so this means they're gone
+const SERVER_TIMEOUT = 12000;    // to reach the matchmaking server
+const JOIN_TIMEOUT = 25000;      // from finding the lobby to being in it
+const SILENCE = 12000;           // pings flow every 2 s, so this means they're gone
 const CODE_CHARS = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+
+// Where two browsers find a route to each other. STUN works on most home
+// networks; the TURN relays carry the game when a network (often school or
+// work Wi-Fi, or two computers behind the same router) won't allow a direct
+// connection. Port 443 relays get through the strictest firewalls.
+const ICE_SERVERS = [
+  { urls: ['stun:stun.l.google.com:19302', 'stun:stun1.l.google.com:19302'] },
+  { urls: 'stun:stun.cloudflare.com:3478' },
+  { urls: ['turn:eu-0.turn.peerjs.com:3478', 'turn:us-0.turn.peerjs.com:3478'], username: 'peerjs', credential: 'peerjsp' },
+  { urls: ['turn:openrelay.metered.ca:80', 'turn:openrelay.metered.ca:443', 'turns:openrelay.metered.ca:443?transport=tcp'], username: 'openrelayproject', credential: 'openrelayproject' },
+];
+
+const BLOCKED = "Found the lobby, but couldn't open a connection to the host's computer. Some school and work networks block this. Try a different Wi-Fi network or a phone hotspot (it only needs to work on one side).";
 
 let peerLib = null;
 function loadPeer() {
@@ -28,7 +42,7 @@ function loadPeer() {
 // ?peer=host:port points at a self-hosted PeerJS server (used by tests)
 function peerOptions() {
   const v = new URLSearchParams(location.search).get('peer');
-  const opts = { debug: 1 };
+  const opts = { debug: 1, config: { iceServers: ICE_SERVERS } };
   if (v) {
     const [host, port] = v.split(':');
     Object.assign(opts, { host, port: Number(port) || 9000, path: '/', secure: false });
@@ -83,10 +97,13 @@ export class HostLink extends Emitter {
 
   send(msg) { this.lobby.fromPlayer(this.id, msg); }
 
+  status(text) { this.emit({ t: 'status', text }); }
+
   async goOnline() {
+    this.status('Contacting the matchmaking server...');
     let Peer;
     try { Peer = await loadPeer(); } catch {
-      this.emit({ t: 'neterror', text: 'Could not load the multiplayer library. Check your internet connection.' });
+      this.emit({ t: 'neterror', text: 'Could not load the multiplayer library. Check your internet connection, then try again.' });
       return;
     }
     for (let attempt = 0; attempt < 5 && !this.closed; attempt++) {
@@ -95,11 +112,15 @@ export class HostLink extends Emitter {
         await this.listen(Peer, code);
         this.lobby.code = code;
         this.lobby.sendLobby();
+        this.status('Lobby is open. Send your friends the code or the invite link.');
         this.pinger = setInterval(() => this.heartbeat(), 2000);
         return;
       } catch (e) {
         if (e && e.type === 'unavailable-id') continue;
-        this.emit({ t: 'neterror', text: `Couldn't reach the matchmaking service (${(e && e.type) || 'error'}). You can still play solo.` });
+        const why = e && e.type === 'timeout'
+          ? "The matchmaking server (0.peerjs.com) didn't answer. Your network may be blocking it, or it may be busy."
+          : `Couldn't reach the matchmaking server (${(e && e.type) || 'error'}).`;
+        this.emit({ t: 'neterror', text: `${why} Leave and try hosting again, or play solo.` });
         return;
       }
     }
@@ -109,9 +130,10 @@ export class HostLink extends Emitter {
     return new Promise((resolve, reject) => {
       const peer = new Peer(PEER_PREFIX + code, peerOptions());
       let open = false;
-      peer.on('open', () => { open = true; this.peer = peer; resolve(); });
+      const timer = setTimeout(() => { if (!open) { peer.destroy(); reject({ type: 'timeout' }); } }, SERVER_TIMEOUT);
+      peer.on('open', () => { open = true; clearTimeout(timer); this.peer = peer; resolve(); });
       peer.on('error', (e) => {
-        if (!open) { peer.destroy(); reject(e); return; }
+        if (!open) { clearTimeout(timer); peer.destroy(); reject(e); return; }
         console.warn('peer error', e.type);
       });
       // keep the code registered so more friends can still find us
@@ -123,10 +145,12 @@ export class HostLink extends Emitter {
   accept(conn) {
     const g = { conn, id: null, last: performance.now() };
     this.guests.add(g);
+    this.status('Someone is connecting...');
     const drop = () => {
       if (!this.guests.has(g)) return;
       this.guests.delete(g);
       if (g.id) this.lobby.remove(g.id);
+      else this.status("A friend found your lobby but couldn't connect. One of your networks is blocking the connection; a phone hotspot on either side usually fixes it.");
       try { conn.close(); } catch { /* already closed */ }
     };
     g.drop = drop;
@@ -137,6 +161,7 @@ export class HostLink extends Emitter {
         if (msg.t !== 'hello') return;
         g.id = this.lobby.add(msg.name, (m) => { if (conn.open) conn.send(m); });
         if (!g.id) setTimeout(drop, 1000);
+        else this.status('A friend joined. Clock in when everyone is here.');
         return;
       }
       this.lobby.fromPlayer(g.id, msg);
@@ -148,7 +173,7 @@ export class HostLink extends Emitter {
   heartbeat() {
     const now = performance.now();
     for (const g of [...this.guests]) {
-      if (now - g.last > SILENCE) g.drop();
+      if (now - g.last > (g.id ? SILENCE : JOIN_TIMEOUT)) g.drop();
       else if (g.conn.open) g.conn.send({ t: 'ping' });
     }
   }
@@ -171,37 +196,60 @@ export class GuestLink extends Emitter {
     this.code = code.toUpperCase().replace(/[^A-Z]/g, '');
   }
 
+  status(text) { this.emit({ t: 'status', text }); }
+
+  // Resolves once we're in the host's lobby. Each stage reports progress and
+  // fails with a reason, so a blocked network doesn't look like a hang.
   connect() {
-    return new Promise(async (resolve, reject) => {
-      const fail = (text) => { this.close(); reject(new Error(text)); };
-      const timer = setTimeout(() => fail(`Couldn't reach lobby ${this.code}. Check the code and make sure the host still has the game open.`), JOIN_TIMEOUT);
-      let Peer;
-      try { Peer = await loadPeer(); } catch { clearTimeout(timer); fail('Could not load the multiplayer library. Check your internet connection.'); return; }
-      const peer = (this.peer = new Peer(peerOptions()));
-      peer.on('error', (e) => {
+    return new Promise((resolve, reject) => {
+      let stage = 'server';
+      let timer = null;
+      const fail = (text) => {
+        if (this.closed) return;
         clearTimeout(timer);
-        if (e.type === 'peer-unavailable') fail(`There's no lobby with code ${this.code}. The host may have closed the game.`);
-        else if (!this.id) fail(`Couldn't connect to lobby ${this.code} (${e.type}).`);
-      });
-      peer.on('open', () => {
-        const conn = (this.conn = peer.connect(PEER_PREFIX + this.code, { reliable: true, serialization: 'json' }));
-        conn.on('open', () => {
-          this.last = performance.now();
-          conn.send({ t: 'hello', name: this.name });
-          this.pinger = setInterval(() => {
-            if (performance.now() - this.last > SILENCE) this.lost();
-            else if (conn.open) conn.send({ t: 'ping' });
-          }, 2000);
+        this.close();
+        reject(new Error(text));
+      };
+      const wait = (ms, text) => { clearTimeout(timer); timer = setTimeout(() => fail(text), ms); };
+      this.status('Contacting the matchmaking server...');
+      wait(SERVER_TIMEOUT, "The matchmaking server (0.peerjs.com) didn't answer. Your network may be blocking it, or it may be busy. Try again in a moment.");
+      loadPeer().then((Peer) => {
+        if (this.closed) return;
+        const peer = (this.peer = new Peer(peerOptions()));
+        peer.on('error', (e) => {
+          if (e.type === 'peer-unavailable') fail(`There's no lobby with code ${this.code}. Check the code; the host must be on the lobby screen with the game open.`);
+          else if (stage !== 'in') fail(stage === 'server' ? `Couldn't reach the matchmaking server (${e.type}).` : `Couldn't connect to lobby ${this.code} (${e.type}).`);
         });
-        conn.on('data', (msg) => {
-          this.last = performance.now();
-          if (!msg || typeof msg !== 'object' || msg.t === 'ping') return;
-          if (msg.t === 'welcome') { this.id = msg.id; clearTimeout(timer); resolve(); }
-          if (msg.t === 'refused') { clearTimeout(timer); fail(msg.text); return; }
-          this.emit(msg);
+        peer.on('open', () => {
+          stage = 'host';
+          this.status(`Found the matchmaking server. Connecting to lobby ${this.code}...`);
+          wait(JOIN_TIMEOUT, BLOCKED);
+          const conn = (this.conn = peer.connect(PEER_PREFIX + this.code, { reliable: true, serialization: 'json' }));
+          conn.on('iceStateChanged', (st) => {
+            if (st === 'checking') this.status("Lobby found. Opening a connection to the host's computer...");
+            if (st === 'failed' && stage !== 'in') fail(BLOCKED);
+          });
+          conn.on('error', (e) => { if (stage !== 'in') fail(e && e.type === 'negotiation-failed' ? BLOCKED : `Couldn't connect to lobby ${this.code} (${(e && e.type) || 'error'}).`); });
+          conn.on('open', () => {
+            stage = 'hello';
+            this.status('Connected. Joining the lobby...');
+            this.last = performance.now();
+            conn.send({ t: 'hello', name: this.name });
+            this.pinger = setInterval(() => {
+              if (performance.now() - this.last > SILENCE) this.lost();
+              else if (conn.open) conn.send({ t: 'ping' });
+            }, 2000);
+          });
+          conn.on('data', (msg) => {
+            this.last = performance.now();
+            if (!msg || typeof msg !== 'object' || msg.t === 'ping') return;
+            if (msg.t === 'welcome') { this.id = msg.id; stage = 'in'; clearTimeout(timer); resolve(); }
+            if (msg.t === 'refused') { fail(msg.text); return; }
+            this.emit(msg);
+          });
+          conn.on('close', () => { if (stage === 'in') this.lost(); else fail(`The host closed the connection to lobby ${this.code}.`); });
         });
-        conn.on('close', () => this.lost());
-      });
+      }, () => fail('Could not load the multiplayer library. Check your internet connection.'));
     });
   }
 

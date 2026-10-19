@@ -61,6 +61,8 @@ export class Lobby {
     } else if (msg.t === 'fill' && id === this.hostId) {
       this.fill = !!msg.fill;
       this.sendLobby();
+    } else if (msg.t === 'skip' && id === this.hostId) {
+      if (this.match) this.match.skipIntro();
     } else if (msg.t === 'tolobby' && id === this.hostId) {
       this.stopMatch();
       this.sendLobby();
@@ -98,7 +100,7 @@ export class Lobby {
     }
     const seed = Math.random().toString(36).slice(2, 10);
     this.match = new Match({ seed, roster, send: (to, msg) => this.send(to, msg) });
-    this.send(null, { t: 'start', seed, roster });
+    this.send(null, { t: 'start', seed, roster, slipper: this.match.slipper, host: this.hostId });
     let last = performance.now(), acc = 0;
     this.stopTicker = this.ticker(() => {
       const now = performance.now();

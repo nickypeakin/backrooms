@@ -2,24 +2,24 @@
 
 A co-op, first-person Backrooms horror game that runs in the browser.
 
-It's closing time at Gold Oak Furniture. You and up to three coworkers have to
-take the inventory sheet to the stockroom at the end of the back hallway, and
-nobody mopped the floor. The first person to step in the puddle slips, falls
-backwards *through the wall* and lands on damp carpet under buzzing
-fluorescent lights. The wall where they went through starts to glitch, and
-everyone else has to walk into it and follow them.
+It opens with a cutscene. It's closing time at Gold Oak Furniture, and your
+crew heads down the back hallway to drop the inventory sheet in the
+stockroom. Nobody mopped. One of you (picked at random) slips, falls
+backwards *through the wall*, and is gone. The wall starts to glitch, and
+the rest of you walk into it after them. Everyone comes to on damp carpet
+under buzzing fluorescent lights. The host can hold Space to skip it.
 
 Then you're all in Level 0, and you have to:
 
-- **Regroup.** Everyone lands near the same spot.
-- **Find the way out.** Somewhere in the maze is a door with an EXIT sign. You
-  can hear it buzz when you get close. Someone has drawn arrows on the walls;
-  most of them point the right way.
-- **Stay sane.** Sanity drains while you're in Level 0, and faster when you
-  wander off alone. Almond water brings it back.
-- **Don't get caught.** About 40 seconds after the first person arrives,
-  something wakes up. It wanders, listens for running and chases anyone it
-  sees. Lights flicker as it gets close. Break line of sight to lose it.
+- **Stay together.** Sanity drains while you're in Level 0, and faster when
+  you wander off alone. Almond water brings it back.
+- **Find the way out.** Somewhere in the maze is a door with an EXIT sign.
+  The map in the top-left corner fills in as you explore and shows where
+  your teammates are. You can hear the sign buzz when you get close, and
+  someone has drawn arrows on the walls; most of them point the right way.
+- **Don't get caught.** About 40 seconds in, something wakes up. It wanders,
+  listens for running and chases anyone it sees. Lights flicker as it gets
+  close. Break line of sight to lose it.
 
 If you're caught or escape, you watch your teammates until the round ends.
 
@@ -38,6 +38,7 @@ with a keyboard and mouse.
 | Q | drink almond water |
 | F | flashlight |
 | Esc | pause |
+| Space (hold) | skip the opening cutscene (host only) |
 
 ## Playing with friends
 
@@ -52,6 +53,13 @@ connect straight to it over WebRTC. The free [PeerJS](https://peerjs.com)
 service is only used to find each other by lobby code. The host has to keep
 the game open while everyone plays. If a friend drops out mid-match, a bot
 takes over their character.
+
+While joining, the title screen says what it's doing (reaching the
+matchmaking server, finding the lobby, connecting to the host) and gives a
+reason if a step fails. Some school and work networks block these direct
+connections; the game then tries public relay servers, and if that fails
+too, switching either player to a different network (a phone hotspot works)
+usually fixes it.
 
 ## Publishing to GitHub Pages (one-time setup)
 
@@ -74,7 +82,10 @@ npm test         # plays a few headless matches against the host simulation
 ## How it's built
 
 Plain JavaScript modules and [three.js](https://threejs.org). Every texture,
-model and sound is generated in code, so there are no asset files.
+model and sound is generated in code, so there are no asset files. The
+picture renders at full resolution and drops resolution automatically on
+computers that can't keep up; the camcorder grain can be turned off in
+Settings.
 
 ```
 public/
@@ -92,10 +103,13 @@ public/
     entity.js             the thing in Level 0
     nav.js                movement and path following
   js/client/              what each player sees and hears
-    game.js               first-person play, cutscenes, spectating
-    storeScene.js         the furniture store
+    game.js               first-person play, spectating
+    cutscene.js           the opening cutscene, scripted shot by shot
+    avatar.js             other players as this client sees them
+    minimap.js            the explored-area map
+    storeScene.js         the furniture store (lit with shadows and reflections)
     level0Scene.js        Level 0, lit by a custom fluorescent-grid shader
-    vhs.js                the camcorder look (tape wobble, static, grain)
+    vhs.js                final picture: camcorder look, static, letterbox
     audio.js              synthesised hum, muzak, footsteps, the entity
     models.js, textures.js, net.js, input.js, ui.js, attract.js
 ```

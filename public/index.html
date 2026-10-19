@@ -9,7 +9,7 @@
   <link rel="stylesheet" href="vendor/vt323/latin-400.css">
   <link rel="stylesheet" href="css/style.css">
   <script type="importmap">
-  { "imports": { "three": "./vendor/three.module.min.js" } }
+  { "imports": { "three": "./vendor/three.module.min.js", "three/addons/": "./vendor/three-addons/" } }
   </script>
 </head>
 <body>
@@ -20,6 +20,7 @@
     <div class="cam tr"><span id="batt">&#9646;&#9646;&#9646;&#9647;</span></div>
     <div class="cam bl">SP &#9654;</div>
     <div class="cam br"><div id="tc"></div><div id="date"></div></div>
+    <canvas id="minimap" width="180" height="180" hidden></canvas>
     <div id="objective"></div>
     <ul id="team"></ul>
     <div id="cross"></div>
@@ -80,8 +81,8 @@
       <h2 class="head">HOW TO PLAY</h2>
       <div class="text">
         <p>It's closing time at Gold Oak Furniture. Your manager wants the inventory sheet in the stockroom, at the end of the back hallway. Somebody forgot to mop.</p>
-        <p>The first person to step in that puddle slips, falls backwards <em>through the wall</em> and lands in the Backrooms. The wall where they went through doesn't stay solid. Everyone else has to follow them in.</p>
-        <p>In Level 0, find each other, then find the door with the <em>EXIT</em> sign. Hand-drawn arrows on the walls point the way, and most of them are right. You can hear the sign buzzing when you get close.</p>
+        <p>One of you steps in that puddle, slips, and falls backwards <em>through the wall</em> into the Backrooms. The wall doesn't stay solid, and the rest of you go in after them.</p>
+        <p>In Level 0, stay together and find the door with the <em>EXIT</em> sign. The map in the top-left corner fills in as you explore. Hand-drawn arrows on the walls point the way, and most of them are right. You can hear the sign buzzing when you get close.</p>
         <p>You are not alone down there. It wanders, it listens for running, and once it sees you it won't stop. Break its line of sight. Your sanity drains while you're in Level 0, and faster when you're on your own. Almond water helps.</p>
         <table>
           <tr><td>WASD</td><td>walk</td></tr>
@@ -91,6 +92,7 @@
           <tr><td>Q</td><td>drink almond water</td></tr>
           <tr><td>F</td><td>flashlight</td></tr>
           <tr><td>Esc</td><td>pause</td></tr>
+          <tr><td>Space</td><td>hold to skip the opening (host)</td></tr>
         </table>
       </div>
       <div class="row center"><button class="small" data-act="back">BACK</button></div>
@@ -102,6 +104,7 @@
         <label class="slider">MOUSE SENSITIVITY <input type="range" id="sens" min="0.2" max="3" step="0.05"></label>
         <label class="slider">VOLUME <input type="range" id="vol" min="0" max="1" step="0.02"></label>
         <label class="check"><input type="checkbox" id="invert"> Invert mouse Y</label>
+        <label class="check"><input type="checkbox" id="look"> Old camcorder look (grain, vignette)</label>
       </div>
       <div class="row center"><button class="small" data-act="back">BACK</button></div>
     </section>

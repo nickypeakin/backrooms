@@ -20,6 +20,10 @@ fs.rmSync(OUT, { recursive: true, force: true });
 copy(path.join(ROOT, 'public'), OUT);
 
 copy(path.join(NM, 'three', 'build', 'three.module.min.js'), path.join(OUT, 'vendor', 'three.module.min.js'));
+// the three.js add-ons the game imports (each only imports 'three' itself)
+for (const f of ['geometries/RoundedBoxGeometry.js', 'environments/RoomEnvironment.js', 'utils/BufferGeometryUtils.js']) {
+  copy(path.join(NM, 'three', 'examples', 'jsm', f), path.join(OUT, 'vendor', 'three-addons', f));
+}
 copy(path.join(NM, 'peerjs', 'dist', 'peerjs.min.js'), path.join(OUT, 'vendor', 'peerjs.min.js'));
 
 // VT323 (the camcorder font): only the latin subset

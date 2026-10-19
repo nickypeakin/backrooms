@@ -28,7 +28,12 @@ canvas#gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block
 .cam .dot { display: inline-block; width: 16px; height: 16px; border-radius: 50%; background: var(--red); animation: blink 1.2s steps(1) infinite; vertical-align: 1px; }
 @keyframes blink { 50% { opacity: 0; } }
 
+#minimap { position: absolute; top: 64px; left: 30px; width: 180px; height: 180px; }
 #objective { position: absolute; top: 70px; left: 30px; max-width: min(560px, 60vw); font-size: 24px; color: var(--yellow); line-height: 1.05; }
+#minimap:not([hidden]) ~ #objective { top: 256px; max-width: 300px; font-size: 22px; }
+#hud.cinematic > :not(#subs):not(#banner):not(#prompt):not(#flash) { display: none; }
+#hud.cinematic #prompt { top: auto; bottom: 16px; right: 24px; left: auto; font-size: 22px; color: var(--dim); }
+#hud.cinematic #subs { bottom: 13%; }
 #team { position: absolute; top: 70px; right: 30px; margin: 0; padding: 0; list-style: none; text-align: right; font-size: 22px; line-height: 1.05; }
 #team li.me { color: var(--yellow); }
 #team li.out { color: #8e8a7a; }
@@ -124,6 +129,8 @@ input:focus { outline: none; border-color: var(--yellow); }
   #hud { font-size: 20px; }
   .cam { font-size: 24px; }
   #objective { font-size: 19px; top: 56px; left: 16px; max-width: 70vw; }
+  #minimap { top: 52px; left: 16px; width: 120px; height: 120px; }
+  #minimap:not([hidden]) ~ #objective { top: 180px; max-width: 45vw; font-size: 18px; }
   #team { font-size: 18px; top: 56px; right: 16px; }
   .cam.tl, .cam.bl { left: 16px; }
   .cam.tr, .cam.br { right: 16px; }

@@ -324,13 +324,24 @@ export class Level0 {
     return out;
   }
 
-  // a landing spot for someone following through the wall: around, not on
-  // top of, the spot where the first one landed
-  arrivalPoint(rng = Math.random) {
-    const a = rng() * Math.PI * 2, r = 1.6 + rng() * 1.2;
-    return {
-      x: this.centerX(this.spawn) + Math.cos(a) * r,
-      z: this.centerZ(this.spawn) + Math.sin(a) * r,
-    };
+  // Where everyone comes to after falling through: the one who slipped in
+  // the middle of the room they landed in, the rest in a loose ring around
+  // them, all facing in. Index i is the player's place in the roster.
+  introSpots(count, slipper) {
+    const cx = this.centerX(this.spawn), cz = this.centerZ(this.spawn);
+    const out = [];
+    let k = 0;
+    for (let i = 0; i < count; i++) {
+      if (i === slipper) { out.push({ x: cx, z: cz }); continue; }
+      const a = 0.7 + (k++ * Math.PI * 2) / Math.max(1, count - 1);
+      out.push({ x: cx + Math.cos(a) * 2.3, z: cz + Math.sin(a) * 2.3 });
+    }
+    // the others face the one who slipped, who faces the first of them
+    const first = out.find((_, i) => i !== slipper) || { x: cx, z: cz - 1 };
+    out.forEach((p, i) => {
+      const t = i === slipper ? first : { x: cx, z: cz };
+      p.ry = Math.atan2(-(t.x - p.x), -(t.z - p.z));
+    });
+    return out;
   }
 }

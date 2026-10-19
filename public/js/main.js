@@ -20,18 +20,21 @@ try {
   setMsg('titleMsg', 'Your browser could not start WebGL, which this game needs. Try Chrome, Edge or Firefox on a computer.');
   throw new Error('WebGL unavailable');
 }
-renderer.setPixelRatio(1);
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 const vhs = new VHS(renderer);
 const input = new Input(canvas);
 const hud = new Hud();
 const attract = new Attract();
 
 // ------------------------------------------------------------- settings --
+const params = new URLSearchParams(location.search);
 const SETTINGS_KEY = 'backrooms-closing-time';
-const settings = { name: '', sens: 1, vol: 0.8, invert: false };
+const settings = { name: '', sens: 1, vol: 0.8, invert: false, look: true };
 try { Object.assign(settings, JSON.parse(localStorage.getItem(SETTINGS_KEY)) || {}); } catch { /* private mode */ }
 const save = () => { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(settings)); } catch { /* private mode */ } };
 sound.volume = settings.vol;
+vhs.look = settings.look ? 1 : 0;
 
 const DEFAULT_NAMES = ['Alex', 'Sam', 'Jordan', 'Casey', 'Riley', 'Morgan', 'Jamie', 'Taylor'];
 $('name').value = settings.name || DEFAULT_NAMES[Math.floor(Math.random() * DEFAULT_NAMES.length)];
@@ -41,8 +44,9 @@ $('invert').checked = settings.invert;
 $('sens').addEventListener('input', (e) => { settings.sens = +e.target.value; save(); });
 $('vol').addEventListener('input', (e) => { settings.vol = +e.target.value; sound.setVolume(settings.vol); save(); });
 $('invert').addEventListener('change', (e) => { settings.invert = e.target.checked; save(); });
+$('look').checked = settings.look;
+$('look').addEventListener('change', (e) => { settings.look = e.target.checked; vhs.look = settings.look ? 1 : 0; save(); });
 
-const params = new URLSearchParams(location.search);
 if (params.get('join')) $('code').value = params.get('join').toUpperCase().slice(0, 5);
 document.fonts?.load('40px VT323').catch(() => {});
 
@@ -53,10 +57,31 @@ let solo = false;
 let backTo = 'title';
 let paused = false;
 
+// Resolution adapts to the computer: if frames take too long the picture
+// renders at a lower resolution, and climbs back once there's headroom.
+// `?scale=0.5` fixes it (used by tests).
+const fixedScale = Number(params.get('scale')) || 0;
+let quality = fixedScale || 1;
+let frameAvg = 1 / 60, judgeT = 0, calmT = 0;
+function adaptQuality(dt) {
+  if (fixedScale) return;
+  frameAvg += (dt - frameAvg) * 0.05;
+  judgeT += dt;
+  calmT += dt;
+  if (judgeT < 2) return;
+  judgeT = 0;
+  let next = quality;
+  if (frameAvg > 1 / 35 && quality > 0.5) { next = Math.max(0.5, quality - 0.15); calmT = 0; }
+  else if (frameAvg < 1 / 57 && quality < 1 && calmT > 8) next = Math.min(1, quality + 0.1);
+  if (next !== quality) {
+    quality = next;
+    vhs.setSize(innerWidth, innerHeight, quality);
+  }
+}
+
 function resize() {
   const w = innerWidth, h = innerHeight;
-  renderer.setSize(w, h, false);
-  vhs.setSize(w, h);
+  vhs.setSize(w, h, quality);
   attract.resize(w, h);
   if (game) game.resize(w, h);
 }
@@ -90,8 +115,8 @@ function wire(l) {
     if (l !== link || game || solo) return;
     showScreen('lobby');
     renderLobby(m, l.id);
-    if (m.code) setMsg('lobbyMsg', '');
   });
+  l.on('status', (m) => { if (l === link && !game) setMsg(l.isHost ? 'lobbyMsg' : 'titleMsg', m.text); });
   l.on('start', (m) => { if (l === link) startGame(m); });
   l.on('over', (m) => { if (l === link) endGame(m.results); });
   l.on('closed', (m) => { if (l === link) { leave(); setMsg('titleMsg', m.text); } });
@@ -112,7 +137,6 @@ const actions = {
     link = new HostLink(playerName(), { online: true });
     wire(link);
     showScreen('lobby');
-    setMsg('lobbyMsg', 'Setting up your lobby...');
   },
   join() {
     const code = $('code').value.toUpperCase().replace(/[^A-Z]/g, '');
@@ -121,7 +145,6 @@ const actions = {
     solo = false;
     const l = (link = new GuestLink(playerName(), code));
     wire(l);
-    setMsg('titleMsg', `Connecting to lobby ${code}...`);
     l.connect().then(() => setMsg('titleMsg', '')).catch((e) => {
       if (link === l) link = null;
       setMsg('titleMsg', e.message);
@@ -231,12 +254,13 @@ let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
+  adaptQuality(dt);
   if (game) {
     if (!paused) game.update(dt);
     game.render();
   } else {
     attract.update(dt);
-    vhs.render(attract.view.scene, attract.camera, { time: now / 1000, noise: 0.02 });
+    vhs.render(attract.view.scene, attract.camera, { time: now / 1000 });
   }
   requestAnimationFrame(frame);
 }

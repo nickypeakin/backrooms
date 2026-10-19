@@ -1,18 +1,18 @@
-// One match, simulated by the hosting player's browser. Clients move their
-// own characters and report where they are; the host decides who slips,
-// moves the bots and the entity, hands out almond water and says when it's
-// over. It has no DOM or three.js dependencies so tests can run it in Node.
+// One match, simulated by the hosting player's browser. It opens with the
+// cutscene (everyone watches the same one; the host picks who slips), then
+// puts everyone in Level 0. From there clients move their own characters and
+// report where they are; the host moves the bots and the entity, hands out
+// almond water and says when it's over. It has no DOM or three.js
+// dependencies so tests can run it in Node.
 
 import { Level0 } from '../shared/maze.js';
-import { SPAWNS, inSpill, touchingHole, HOLE } from '../shared/store.js';
 import { makeRng } from '../shared/rng.js';
-import { PLAYER_R, SNAP_EVERY, ESCAPE_GRACE } from '../shared/config.js';
+import { PLAYER_R, SNAP_EVERY, ESCAPE_GRACE, INTRO_LEN } from '../shared/config.js';
 import { Entity } from './entity.js';
 import { updateBot, say } from './bots.js';
 
-export const LV = { store: 0, gone: 1, l0: 2 };
+export const LV = { store: 0, l0: 1 };
 export const ST = { alive: 0, caught: 1, escaped: 2 };
-const LV_NAME = ['store', 'gone', 'l0'];
 
 const round = (v) => Math.round(v * 100) / 100;
 
@@ -26,15 +26,15 @@ export class Match {
     this.entity = new Entity(this.level, this.rng);
     this.t = 0;
     this.ticks = 0;
-    this.slip = null;
+    this.phase = 'intro';
+    this.slipper = this.rng.int(0, roster.length - 1);
     this.taken = new Set();
     this.endAt = null;
     this.over = false;
-    this.players = roster.map((r, i) => ({
+    this.players = roster.map((r) => ({
       id: r.id, name: r.name, bot: !!r.bot, color: r.color,
-      x: SPAWNS[i].x, z: SPAWNS[i].z, ry: 0, rx: 0,
-      lv: 'store', st: 'alive', mv: 0, fl: 0, lost: false,
-      slipping: false, timer: 0, t0: null, tEnd: null,
+      x: 0, z: 0, ry: 0, rx: 0,
+      lv: 'store', st: 'alive', mv: 0, fl: 0, lost: false, t0: null, tEnd: null,
     }));
   }
 
@@ -47,18 +47,13 @@ export class Match {
     if (!p || p.bot || this.over) return;
     switch (msg.t) {
       case 'st': {
-        if (p.st !== 'alive') return;
+        if (p.st !== 'alive' || this.phase !== 'play') return;
         if (Number.isFinite(msg.x) && Number.isFinite(msg.z)) { p.x = msg.x; p.z = msg.z; }
         if (Number.isFinite(msg.ry)) p.ry = msg.ry;
         if (Number.isFinite(msg.rx)) p.rx = msg.rx;
         p.mv = msg.mv | 0;
         p.fl = msg.fl ? 1 : 0;
         p.lost = !!msg.lost;
-        const lv = LV_NAME[msg.lv];
-        if (lv && lv !== p.lv && this.slip) {
-          if (lv === 'l0') this.arrive(p);
-          else if (lv === 'gone' && p.lv === 'store') p.lv = 'gone';
-        }
         break;
       }
       case 'pick': {
@@ -82,28 +77,28 @@ export class Match {
     const p = this.player(id);
     if (!p || p.bot) return;
     p.bot = true;
-    p.brain = null;
+    p.brain = { arrived: true };
     p.lost = false;
-    if (p.lv === 'gone') this.arrive(p);
-    if (p.lv === 'l0') p.brain = { mode: 'l0', arrived: true };
     this.emit({ t: 'dropped', id });
   }
 
   // ------------------------------------------------------------- events --
-  doSlip(p) {
-    this.slip = { id: p.id, x: p.x, z: p.z, t: this.t };
-    p.slipping = true;
-    p.timer = 0;
-    this.emit({ t: 'slip', id: p.id, x: round(p.x), z: round(p.z) });
+  // the host can cut the opening cutscene short for everyone
+  skipIntro() {
+    if (this.phase === 'intro') this.t = Math.max(this.t, INTRO_LEN);
   }
 
-  arrive(p, at) {
-    const a = at || this.level.arrivalPoint(this.rng);
-    p.lv = 'l0';
-    p.slipping = false;
-    if (p.bot || at) { p.x = a.x; p.z = a.z; }
-    if (p.t0 == null) p.t0 = this.t;
+  // the cutscene is over: everyone is lying on the carpet in Level 0
+  enterLevel0() {
+    this.phase = 'play';
+    const spots = this.level.introSpots(this.players.length, this.slipper);
+    this.players.forEach((p, i) => {
+      Object.assign(p, spots[i]);
+      p.lv = 'l0';
+      p.t0 = this.t;
+    });
     this.entity.arm(this.t);
+    this.emit({ t: 'go' });
   }
 
   catchPlayer(p) {
@@ -127,28 +122,18 @@ export class Match {
     this.t += dt;
     this.ticks++;
     const L = this.level;
+    if (this.phase === 'intro') {
+      if (this.t >= INTRO_LEN) this.enterLevel0();
+      return;
+    }
 
     for (const p of this.players) {
-      if (p.st !== 'alive') continue;
-      if (p.bot && p.slipping) {
-        // the bot that slipped: falls, is gone for a moment, lands in Level 0
-        p.timer += dt;
-        p.mv = 0;
-        if (p.timer > 1.1 && p.lv === 'store') p.lv = 'gone';
-        if (p.timer > 2.6) this.arrive(p, { x: L.centerX(L.spawn), z: L.centerZ(L.spawn) });
-        continue;
-      }
-      if (p.bot && p.lv === 'gone') {
-        p.timer += dt;
-        if (p.timer > 1.0) this.arrive(p);
-        continue;
-      }
-      if (p.bot) updateBot(this, p, dt);
+      if (p.bot && p.st === 'alive') updateBot(this, p, dt);
     }
 
     // bots don't stand inside people
     for (const p of this.players) {
-      if (!p.bot || p.st !== 'alive' || p.slipping || p.lv === 'gone') continue;
+      if (!p.bot || p.st !== 'alive') continue;
       for (const q of this.players) {
         if (q === p || q.st !== 'alive' || q.lv !== p.lv) continue;
         const dx = p.x - q.x, dz = p.z - q.z, d = Math.hypot(dx, dz);
@@ -156,20 +141,6 @@ export class Match {
           const push = (PLAYER_R * 2.2 - d) * 0.5;
           p.x += (dx / d) * push;
           p.z += (dz / d) * push;
-        }
-      }
-    }
-
-    // the first person to walk through the puddle goes down
-    if (!this.slip) {
-      const p = this.players.find((q) => q.st === 'alive' && q.lv === 'store' && inSpill(q.x, q.z));
-      if (p) this.doSlip(p);
-    } else {
-      for (const p of this.players) {
-        if (p.bot && p.st === 'alive' && p.lv === 'store' && !p.slipping && touchingHole(p.x, p.z, PLAYER_R + 0.05)) {
-          p.lv = 'gone';
-          p.timer = 0;
-          p.x = HOLE.x - 0.5;
         }
       }
     }
@@ -202,7 +173,7 @@ export class Match {
       T: round(this.t),
       ps: this.players.map((p) => [
         p.id, round(p.x), round(p.z), round(p.ry), round(p.rx), LV[p.lv], ST[p.st], p.mv,
-        (p.fl ? 1 : 0) | (p.lost ? 2 : 0) | (p.slipping ? 4 : 0),
+        (p.fl ? 1 : 0) | (p.lost ? 2 : 0),
       ]),
       e: this.entity.visible ? this.entity.snapshot() : null,
       tk: [...this.taken],
