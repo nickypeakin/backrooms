@@ -1,0 +1,137 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>The Backrooms: Closing Time</title>
+  <meta name="description" content="A co-op Backrooms horror game in your browser. Closing time at the furniture store, one of you slips through the wall, and everyone else has to follow.">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' fill='%23c9b45f'/%3E%3Crect x='8' y='10' width='48' height='8' fill='%23fffbe0'/%3E%3Crect x='20' y='30' width='24' height='34' fill='%235e512b'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="vendor/vt323/latin-400.css">
+  <link rel="stylesheet" href="css/style.css">
+  <script type="importmap">
+  { "imports": { "three": "./vendor/three.module.min.js" } }
+  </script>
+</head>
+<body>
+  <canvas id="gl"></canvas>
+
+  <div id="hud" hidden>
+    <div class="cam tl"><span class="dot"></span> REC</div>
+    <div class="cam tr"><span id="batt">&#9646;&#9646;&#9646;&#9647;</span></div>
+    <div class="cam bl">SP &#9654;</div>
+    <div class="cam br"><div id="tc"></div><div id="date"></div></div>
+    <div id="objective"></div>
+    <ul id="team"></ul>
+    <div id="cross"></div>
+    <div id="prompt"></div>
+    <div id="subs"></div>
+    <div id="toasts"></div>
+    <div id="flash"></div>
+    <div id="banner" hidden><h1></h1><p></p></div>
+    <div id="meters">
+      <div class="meter" id="sanity"><label>SANITY</label><div class="bar"><i></i></div></div>
+      <div class="meter" id="stamina"><label>STAMINA</label><div class="bar"><i></i></div></div>
+      <div id="almond"></div>
+      <div id="flashicon">&#9673; LIGHT</div>
+    </div>
+  </div>
+
+  <div id="screens">
+    <section id="title" class="screen">
+      <div class="logo">
+        <h1>THE BACKROOMS</h1>
+        <h2>CLOSING TIME</h2>
+        <p class="tag">You were only supposed to lock up.</p>
+      </div>
+      <div class="menu">
+        <label class="field">YOUR NAME <input id="name" maxlength="16" autocomplete="off" spellcheck="false"></label>
+        <button data-act="solo">PLAY SOLO <small>with three bot coworkers</small></button>
+        <button data-act="host">HOST A GAME <small>play with up to 3 friends</small></button>
+        <div class="join">
+          <input id="code" maxlength="5" placeholder="CODE" autocomplete="off" spellcheck="false">
+          <button data-act="join">JOIN</button>
+        </div>
+        <div class="row">
+          <button class="small" data-act="help">HOW TO PLAY</button>
+          <button class="small" data-act="settings">SETTINGS</button>
+        </div>
+        <p id="titleMsg" class="msg"></p>
+      </div>
+      <p class="fine">Fan-made. Inspired by the Backrooms creepypasta and found-footage films. Everything you see and hear is generated in code.</p>
+    </section>
+
+    <section id="lobby" class="screen" hidden>
+      <h2 class="head">LOBBY</h2>
+      <div id="lobbyCode" class="code"></div>
+      <div class="row center">
+        <button class="small" data-act="copy">COPY INVITE LINK</button>
+      </div>
+      <p id="lobbyMsg" class="msg"></p>
+      <ol id="slots"></ol>
+      <label class="check" id="fillRow"><input type="checkbox" id="fill" checked> Fill empty spots with bots</label>
+      <div class="row center">
+        <button data-act="start" id="startBtn">CLOCK IN</button>
+        <button class="small" data-act="leave">LEAVE</button>
+      </div>
+      <p id="lobbyWait" class="msg"></p>
+    </section>
+
+    <section id="help" class="screen" hidden>
+      <h2 class="head">HOW TO PLAY</h2>
+      <div class="text">
+        <p>It's closing time at Gold Oak Furniture. Your manager wants the inventory sheet in the stockroom, at the end of the back hallway. Somebody forgot to mop.</p>
+        <p>The first person to step in that puddle slips, falls backwards <em>through the wall</em> and lands in the Backrooms. The wall where they went through doesn't stay solid. Everyone else has to follow them in.</p>
+        <p>In Level 0, find each other, then find the door with the <em>EXIT</em> sign. Hand-drawn arrows on the walls point the way, and most of them are right. You can hear the sign buzzing when you get close.</p>
+        <p>You are not alone down there. It wanders, it listens for running, and once it sees you it won't stop. Break its line of sight. Your sanity drains while you're in Level 0, and faster when you're on your own. Almond water helps.</p>
+        <table>
+          <tr><td>WASD</td><td>walk</td></tr>
+          <tr><td>Mouse</td><td>look</td></tr>
+          <tr><td>Shift</td><td>run (it can hear you)</td></tr>
+          <tr><td>E</td><td>pick up / open</td></tr>
+          <tr><td>Q</td><td>drink almond water</td></tr>
+          <tr><td>F</td><td>flashlight</td></tr>
+          <tr><td>Esc</td><td>pause</td></tr>
+        </table>
+      </div>
+      <div class="row center"><button class="small" data-act="back">BACK</button></div>
+    </section>
+
+    <section id="settings" class="screen" hidden>
+      <h2 class="head">SETTINGS</h2>
+      <div class="text">
+        <label class="slider">MOUSE SENSITIVITY <input type="range" id="sens" min="0.2" max="3" step="0.05"></label>
+        <label class="slider">VOLUME <input type="range" id="vol" min="0" max="1" step="0.02"></label>
+        <label class="check"><input type="checkbox" id="invert"> Invert mouse Y</label>
+      </div>
+      <div class="row center"><button class="small" data-act="back">BACK</button></div>
+    </section>
+
+    <section id="pause" class="screen" hidden>
+      <h2 class="head">PAUSED</h2>
+      <p id="pauseNote" class="msg"></p>
+      <div class="menu narrow">
+        <button data-act="resume">RESUME</button>
+        <button class="small" data-act="settings">SETTINGS</button>
+        <button class="small" data-act="quit">LEAVE GAME</button>
+      </div>
+    </section>
+
+    <section id="clickToPlay" class="screen see-through" hidden>
+      <button data-act="resume">CLICK TO PLAY</button>
+    </section>
+
+    <section id="results" class="screen" hidden>
+      <h2 class="head" id="resultHead"></h2>
+      <ol id="resultList"></ol>
+      <div class="row center">
+        <button data-act="again" id="againBtn">PLAY AGAIN</button>
+        <button class="small" data-act="tolobby" id="toLobbyBtn">BACK TO LOBBY</button>
+        <button class="small" data-act="menu">MAIN MENU</button>
+      </div>
+      <p id="resultWait" class="msg"></p>
+    </section>
+  </div>
+  <noscript>This game needs JavaScript.</noscript>
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>

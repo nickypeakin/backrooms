@@ -1,0 +1,21 @@
+{
+  "name": "backrooms-noclip",
+  "version": "1.0.0",
+  "description": "A co-op 3D Backrooms horror game in the browser. Closing time at a furniture store, one of you slips through the wall, and everyone else has to follow.",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "build": "node scripts/build.js",
+    "dev": "node scripts/build.js && node scripts/serve.js",
+    "test": "node test/sim.test.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "license": "MIT",
+  "dependencies": {
+    "@fontsource/vt323": "5.3.0",
+    "peerjs": "1.5.5",
+    "three": "0.170.0"
+  }
+}
