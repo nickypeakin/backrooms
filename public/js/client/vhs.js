@@ -1,8 +1,9 @@
 // The final picture. The scene renders at full resolution (with
 // anti-aliasing) into a texture, then one full-screen pass adds a light
-// camcorder look (a touch of grain, colour fringe and vignette, which the
-// settings can turn off), letterbox bars for cutscenes, and the heavy stuff
-// when things go wrong: tape tearing, static, fades.
+// camcorder look (a touch of grain and vignette, which the settings can turn
+// off), letterbox bars for cutscenes, and the heavy stuff when things go
+// wrong: tape tearing, colour fringing, static, fades. Normally every screen
+// pixel reads exactly one rendered pixel, so nothing gets softened.
 
 import * as THREE from 'three';
 
@@ -28,7 +29,7 @@ const fragmentShader = /* glsl */`
   void main() {
     vec2 uv = vUv;
     vec2 c = uv - 0.5;
-    uv = 0.5 + c * (1.0 + look * 0.015 * dot(c, c) + warp * 0.12 * sin(time * 2.0 + c.y * 6.0));
+    if (warp > 0.0) uv = 0.5 + c * (1.0 + warp * 0.12 * sin(time * 2.0 + c.y * 6.0));
 
     // tape trouble: only when something is wrong
     float line = floor(uv.y * 270.0);
@@ -38,11 +39,12 @@ const fragmentShader = /* glsl */`
     j += tear * (h(vec2(blockRow, time)) - 0.5) * 0.18 * glitch;
     uv.x += j;
 
-    float ca = look * 0.0006 + glitch * 0.012 + warp * 0.006;
-    vec3 col;
-    col.r = texture2D(tDiffuse, uv + vec2(ca, 0.0)).r;
-    col.g = texture2D(tDiffuse, uv).g;
-    col.b = texture2D(tDiffuse, uv - vec2(ca, 0.0)).b;
+    float ca = glitch * 0.012 + warp * 0.006;
+    vec3 col = texture2D(tDiffuse, uv).rgb;
+    if (ca > 0.0) {
+      col.r = texture2D(tDiffuse, uv + vec2(ca, 0.0)).r;
+      col.b = texture2D(tDiffuse, uv - vec2(ca, 0.0)).b;
+    }
 
     if (tone > 0.5) col = aces(col * exposure);
 
@@ -92,6 +94,15 @@ export class VHS {
     this.post = new THREE.Scene();
     this.post.add(this.quad);
     this.postCam = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  }
+
+  // anti-aliasing samples: 4, or 0 on computers that can't keep up
+  setSamples(n) {
+    if (this.target.samples === n) return;
+    const { width, height } = this.target;
+    this.target.dispose();
+    this.target = new THREE.WebGLRenderTarget(width, height, { type: THREE.HalfFloatType, samples: n });
+    this.uniforms.tDiffuse.value = this.target.texture;
   }
 
   // Full resolution (up to 1.5x on high-density screens) times `quality`,

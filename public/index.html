@@ -16,25 +16,11 @@
   <canvas id="gl"></canvas>
 
   <div id="hud" hidden>
-    <div class="cam tl"><span class="dot"></span> REC</div>
-    <div class="cam tr"><span id="batt">&#9646;&#9646;&#9646;&#9647;</span></div>
-    <div class="cam bl">SP &#9654;</div>
-    <div class="cam br"><div id="tc"></div><div id="date"></div></div>
-    <canvas id="minimap" width="180" height="180" hidden></canvas>
-    <div id="objective"></div>
-    <ul id="team"></ul>
+    <canvas id="minimap" width="180" height="206" hidden></canvas>
     <div id="cross"></div>
     <div id="prompt"></div>
     <div id="subs"></div>
-    <div id="toasts"></div>
-    <div id="flash"></div>
     <div id="banner" hidden><h1></h1><p></p></div>
-    <div id="meters">
-      <div class="meter" id="sanity"><label>SANITY</label><div class="bar"><i></i></div></div>
-      <div class="meter" id="stamina"><label>STAMINA</label><div class="bar"><i></i></div></div>
-      <div id="almond"></div>
-      <div id="flashicon">&#9673; LIGHT</div>
-    </div>
   </div>
 
   <div id="screens">
@@ -104,13 +90,12 @@
       <div class="text">
         <p>It's closing time at Gold Oak Furniture. Your manager wants the inventory sheet in the stockroom, at the end of the back hallway. Somebody forgot to mop.</p>
         <p>One of you steps in that puddle, slips, and falls backwards <em>through the wall</em> into the Backrooms. The wall doesn't stay solid, and the rest of you go in after them.</p>
-        <p>In Level 0, stay together and find the door with the <em>EXIT</em> sign. The map in the top-left corner fills in as you explore. Hand-drawn arrows on the walls point the way, and most of them are right. You can hear the sign buzzing when you get close.</p>
-        <p>You are not alone down there. It wanders, it listens for running, and once it sees you it won't stop. Break its line of sight. Your sanity drains while you're in Level 0, and faster when you're on your own. Almond water helps.</p>
+        <p>In Level 0, stay together and find the door with the <em>EXIT</em> sign, then walk through it. The map in the top-left corner fills in as you explore and shows your friends as coloured dots. Hand-drawn arrows on the walls point the way, and most of them are right. You can hear the sign buzzing when you get close.</p>
+        <p>You are not alone down there. It wanders, it listens for running, and once it sees you it won't stop. Break its line of sight. Your sanity (the yellow ring around the map) drains while you're in Level 0, and faster when you're on your own. Walk over almond water to pick it up (bottles under the map) and press Q to drink one.</p>
         <table>
           <tr><td>WASD</td><td>walk</td></tr>
           <tr><td>Mouse</td><td>look</td></tr>
           <tr><td>Shift</td><td>run (it can hear you)</td></tr>
-          <tr><td>E</td><td>pick up / open</td></tr>
           <tr><td>Q</td><td>drink almond water</td></tr>
           <tr><td>F</td><td>flashlight</td></tr>
           <tr><td>Esc</td><td>pause</td></tr>

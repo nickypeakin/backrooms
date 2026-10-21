@@ -16,7 +16,6 @@ import { Minimap } from './minimap.js';
 import { sound } from './audio.js';
 import { lerp, clamp01, span, angleLerp } from './util.js';
 
-const LV = ['store', 'l0'];
 const ST = ['alive', 'caught', 'escaped'];
 
 export class Game {
@@ -58,7 +57,6 @@ export class Game {
 
     this.avatars = new Map();
     for (const r of this.roster) this.avatars.set(r.id, new Avatar(r, this, r.id === this.me));
-    this.status = new Map(this.roster.map((r) => [r.id, { lv: 'store', st: 'alive' }]));
     this.cutscene = new Cutscene(this, start.slipper);
 
     this.ent = { root: entityModel(), x: 0, z: 0, ry: 0, tx: 0, tz: 0, tr: 0, visible: false, state: 0, speed: 0, stepAcc: 0 };
@@ -68,6 +66,12 @@ export class Game {
     this.scare.visible = false;
     this.l0.scene.add(this.scare);
     this.map = new Minimap(hud.mapCanvas, this.level);
+    // build every shader now, for the render target the game draws into, so
+    // the cutscene doesn't stutter (or look worse) while they compile
+    renderer.setRenderTarget(vhs.target);
+    renderer.compile(this.store.scene, this.camera);
+    renderer.compile(this.l0.scene, this.camera);
+    renderer.setRenderTarget(null);
 
     const L = this.link;
     this.off = [
@@ -77,9 +81,7 @@ export class Game {
       L.on('escaped', (m) => this.onEscaped(m)),
       L.on('roar', (m) => this.onRoar(m)),
       L.on('stir', () => { this.stirred = true; }),
-      L.on('got', () => { this.p.almond++; this.pickPending = null; sound.pickup(); this.hud.toast('Almond water. Press Q to drink it.'); }),
-      L.on('say', (m) => this.hud.say(this.nameOf(m.id), m.text)),
-      L.on('dropped', (m) => this.hud.toast(`${this.nameOf(m.id)} lost connection. A bot is playing as them now.`)),
+      L.on('got', () => { this.p.almond++; this.pickPending = null; sound.pickup(); }),
     ];
 
     sound.startMuzak();
@@ -87,7 +89,6 @@ export class Game {
     hud.show();
     hud.cinematic(true);
     hud.prompt(this.isHost ? 'Hold SPACE to skip' : null);
-    this.updateTeam();
   }
 
   nameOf(id) {
@@ -98,8 +99,6 @@ export class Game {
   // ----------------------------------------------------------- network --
   onSnapshot(m) {
     for (const row of m.ps) {
-      const s = this.status.get(row[0]);
-      if (s) { s.lv = LV[row[5]]; s.st = ST[row[6]]; }
       const a = this.avatars.get(row[0]);
       if (a && !a.isMe) a.apply(row);
       else if (a) a.st = ST[row[6]];
@@ -115,38 +114,24 @@ export class Game {
         sound.roar({ x: e.x, y: 2, z: e.z });
       }
     } else e.visible = false;
-    this.updateTeam();
-  }
-
-  updateTeam() {
-    this.hud.team(this.roster.map((r) => {
-      const s = this.status.get(r.id);
-      const where = s.st === 'caught' ? 'TAKEN' : s.st === 'escaped' ? 'ESCAPED' : s.lv === 'store' ? 'at work' : 'Level 0';
-      return { name: r.name, me: r.id === this.me, bot: r.bot, where, out: s.st !== 'alive' };
-    }));
   }
 
   onCaught(m) {
     if (m.id === this.me) { this.startCaught(); return; }
     const a = this.avatars.get(m.id);
     if (a && a.lv === 'l0') sound.roar({ x: a.x, y: 1.6, z: a.z });
-    this.hud.toast(`${this.nameOf(m.id)} was taken.`);
     if (this.viewing && this.viewing.id === m.id) this.viewing = null;
   }
 
   onEscaped(m) {
     if (m.id === this.me) { this.escapedOk = true; return; }
-    this.hud.toast(`${this.nameOf(m.id)} found the way out.`);
     if (this.viewing && this.viewing.id === m.id) this.viewing = null;
   }
 
   onRoar(m) {
     if (this.mode === 'intro') return;
     sound.roar({ x: this.ent.x, y: 2, z: this.ent.z });
-    if (m.id === this.me && this.mode === 'play') {
-      this.pulse = 1;
-      this.hud.flash('RUN');
-    }
+    if (m.id === this.me && this.mode === 'play') this.pulse = 1;
   }
 
   send() {
@@ -207,6 +192,7 @@ export class Game {
     sound.setListener(cam);
 
     const viewLv = this.viewLevel();
+    this.store.sun.castShadow = this.vhs.shadows;
     this.store.update(dt, this.t);
     if (viewLv === 'l0') {
       this.l0.update(dt, this.t, cam, {
@@ -279,8 +265,6 @@ export class Game {
     this.hud.cinematic(false);
     this.hud.banner(null);
     this.hud.prompt(null);
-    this.hud.objective('Stay together. Find a way out. Listen for the buzz of an EXIT sign. The map fills in as you explore.');
-    this.hud.toast('[WASD] walk  [Shift] run  [F] flashlight  [E] pick up  [Q] drink almond water');
   }
 
   // ---------------------------------------------------------- walking --
@@ -321,35 +305,27 @@ export class Game {
     if (Math.floor(p.stepDist / stride) !== before) sound.step('carpet', p.mv === 2 ? 1.25 : 0.8);
   }
 
+  // No buttons to remember: walk over almond water to pick it up, walk
+  // into the EXIT door to leave. Q drinks, F is the flashlight.
   interact() {
-    const inp = this.input, p = this.p, hud = this.hud;
-    let prompt = null;
+    const inp = this.input, p = this.p;
     if (inp.hit('KeyF')) {
       p.flash = !p.flash;
       sound.step('tile', 0.4);
     }
     const ex = this.level.exit;
-    const i = this.l0.itemNear(p.x, p.z, 1.7, this.taken);
-    if (Math.hypot(ex.x - p.x, ex.z - p.z) < 2.0) {
-      prompt = '[E] Open the door';
-      if (inp.hit('KeyE')) { this.startExit(); return; }
-    } else if (i >= 0) {
-      prompt = '[E] Pick up almond water';
-      if (inp.hit('KeyE') && this.pickPending !== i) {
-        this.pickPending = i;
-        this.link.send({ t: 'pick', i });
-        setTimeout(() => { if (this.pickPending === i) this.pickPending = null; }, 1500);
-      }
+    if (Math.hypot(ex.x - p.x, ex.z - p.z) < 1.1) { this.startExit(); return; }
+    const i = this.l0.itemNear(p.x, p.z, 0.9, this.taken);
+    if (i >= 0 && this.pickPending !== i) {
+      this.pickPending = i;
+      this.link.send({ t: 'pick', i });
+      setTimeout(() => { if (this.pickPending === i) this.pickPending = null; }, 1500);
     }
-    if (inp.hit('KeyQ')) {
-      if (p.almond > 0 && p.sanity < SANITY.max - 1) {
-        p.almond--;
-        p.sanity = Math.min(SANITY.max, p.sanity + SANITY.almond);
-        sound.drink();
-        hud.toast('You feel a little more like yourself.');
-      } else if (p.almond === 0) hud.toast("You don't have any almond water.");
+    if (inp.hit('KeyQ') && p.almond > 0 && p.sanity < SANITY.max - 1) {
+      p.almond--;
+      p.sanity = Math.min(SANITY.max, p.sanity + SANITY.almond);
+      sound.drink();
     }
-    hud.prompt(prompt);
   }
 
   // --------------------------------------------------- the big moments --
@@ -378,7 +354,7 @@ export class Game {
       this.fx.staticAmt = 0;
       this.fx.glitch = 0;
       p.roll = 0;
-      this.hud.banner('YOU WERE TAKEN', 'It got you. Watching the others...');
+      this.hud.banner('YOU WERE TAKEN', 'Watching the others...', 4);
       this.toSpectate();
     }
   }
@@ -406,7 +382,7 @@ export class Game {
       return;
     }
     if (t > 2.4 && this.escapedOk) {
-      this.hud.banner('YOU GOT OUT', '...for now. Watching the others...');
+      this.hud.banner('YOU GOT OUT', '...for now.', 4);
       sound.setHum(0, 1);
       sound.setLoop('exit', null, 0);
       this.toSpectate();
@@ -419,7 +395,6 @@ export class Game {
     this.fx.fadeColor = 0x000000;
     this.p.flash = false;
     this.viewing = null;
-    this.hud.objective(null);
   }
 
   updateSpectate() {
@@ -430,7 +405,7 @@ export class Game {
     if (i < 0) i = 0;
     else if (this.input.clicks > 0 || this.input.hit('Space')) i = (i + 1) % list.length;
     this.viewing = list[i];
-    this.hud.prompt(`Watching ${this.viewing.name}. Click to switch.`);
+    this.hud.prompt(this.viewing.name);
   }
 
   // --------------------------------------------------------- the thing --
@@ -463,10 +438,7 @@ export class Game {
     }
     let drain = buddy ? SANITY.drain : SANITY.drainAlone;
     if (this.ent.visible && Math.hypot(this.ent.x - p.x, this.ent.z - p.z) < 12) drain += SANITY.drainEntity;
-    const before = p.sanity;
     p.sanity = Math.max(0, p.sanity - drain * dt);
-    if (before > 0 && p.sanity <= 0) this.hud.toast("You can't think straight. It can hear you now.");
-    if (before >= 30 && p.sanity < 30) this.hud.toast('Find almond water. Stay near the others.');
     if (p.sanity < 45) {
       this.whisperT -= dt;
       if (this.whisperT <= 0) {
@@ -496,17 +468,16 @@ export class Game {
   }
 
   updateHud(dt) {
-    const p = this.p, hud = this.hud;
+    const p = this.p;
     const playing = this.mode === 'play' || this.mode === 'exiting';
-    hud.bars(playing ? p.sanity / SANITY.max : null, this.mode === 'play' ? p.stamina / STAMINA_MAX : null);
-    hud.almond(playing ? p.almond : null);
-    hud.flashlight(p.flash && playing);
-    hud.showMap(playing);
-    if (playing) {
-      const mates = [];
-      for (const a of this.avatars.values()) if (!a.isMe && a.alive && a.lv === 'l0') mates.push({ x: a.x, z: a.z, color: this.roster.find((r) => r.id === a.id).color });
-      this.map.update(dt, { x: p.x, z: p.z, ry: p.ry, mates, taken: this.taken });
-    }
+    this.hud.showMap(playing);
+    if (!playing) return;
+    const mates = [];
+    for (const a of this.avatars.values()) if (!a.isMe && a.alive && a.lv === 'l0') mates.push({ x: a.x, z: a.z, color: this.roster.find((r) => r.id === a.id).color });
+    this.map.update(dt, {
+      x: p.x, z: p.z, ry: p.ry, mates, taken: this.taken, t: this.t,
+      sanity: p.sanity / SANITY.max, stamina: p.stamina / STAMINA_MAX, almond: p.almond,
+    });
   }
 
   dispose() {

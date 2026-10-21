@@ -12,10 +12,13 @@ under buzzing fluorescent lights. The host can hold Space to skip it.
 Then you're all in Level 0, and you have to:
 
 - **Stay together.** Sanity drains while you're in Level 0, and faster when
-  you wander off alone. Almond water brings it back.
-- **Find the way out.** Somewhere in the maze is a door with an EXIT sign.
-  The map in the top-left corner fills in as you explore and shows where
-  your teammates are. You can hear the sign buzz when you get close, and
+  you wander off alone. Almond water brings it back: walk over a bottle to
+  pick it up, press Q to drink.
+- **Find the way out.** Somewhere in the maze is a door with an EXIT sign;
+  walk through it to escape. The map in the top-left corner is the only
+  thing on screen: it fills in as you explore and shows where your
+  teammates are, the ring around it is your sanity, and the bottles under
+  it are your almond water. You can hear the sign buzz when you get close, and
   someone has drawn arrows on the walls; most of them point the right way.
 - **Don't get caught.** About 40 seconds in, something wakes up. It wanders,
   listens for running and chases anyone it sees. Lights flicker as it gets
@@ -23,7 +26,7 @@ Then you're all in Level 0, and you have to:
 
 If you're caught or escape, you watch your teammates until the round ends.
 
-**Play it:** <https://nickypeakin.github.io/bdb/> (once GitHub Pages is
+**Play it:** <https://nickypeakin.github.io/backrooms/> (once GitHub Pages is
 switched on, see below). It works in Chrome, Edge or Firefox on a computer
 with a keyboard and mouse.
 
@@ -34,7 +37,6 @@ with a keyboard and mouse.
 | WASD / arrows | walk |
 | Mouse | look |
 | Shift | run (it can hear you) |
-| E | pick up almond water / open the exit door |
 | Q | drink almond water |
 | F | flashlight |
 | Esc | pause |

@@ -13,56 +13,20 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #000; color:
 canvas#gl { position: fixed; inset: 0; width: 100%; height: 100%; display: block; }
 [hidden] { display: none !important; }
 
-/* text that looks like it was burned in by the camera */
-.cam, #objective, #team, #prompt, #subs, #toasts, #meters, #banner, #flash {
-  text-shadow: 1px 0 rgba(255, 40, 40, 0.55), -1px 0 rgba(40, 200, 255, 0.5), 0 0 6px rgba(0, 0, 0, 0.8);
-}
-
 /* ------------------------------------------------------------------ HUD -- */
-#hud { position: fixed; inset: 0; pointer-events: none; font-size: 26px; letter-spacing: 1px; }
-.cam { position: absolute; font-size: 34px; color: var(--ink); }
-.cam.tl { top: 22px; left: 30px; }
-.cam.tr { top: 22px; right: 30px; }
-.cam.bl { bottom: 22px; left: 30px; }
-.cam.br { bottom: 18px; right: 30px; text-align: right; line-height: 1; }
-.cam .dot { display: inline-block; width: 16px; height: 16px; border-radius: 50%; background: var(--red); animation: blink 1.2s steps(1) infinite; vertical-align: 1px; }
-@keyframes blink { 50% { opacity: 0; } }
-
-#minimap { position: absolute; top: 64px; left: 30px; width: 180px; height: 180px; }
-#objective { position: absolute; top: 70px; left: 30px; max-width: min(560px, 60vw); font-size: 24px; color: var(--yellow); line-height: 1.05; }
-#minimap:not([hidden]) ~ #objective { top: 256px; max-width: 300px; font-size: 22px; }
-#hud.cinematic > :not(#subs):not(#banner):not(#prompt):not(#flash) { display: none; }
-#hud.cinematic #prompt { top: auto; bottom: 16px; right: 24px; left: auto; font-size: 22px; color: var(--dim); }
-#hud.cinematic #subs { bottom: 13%; }
-#team { position: absolute; top: 70px; right: 30px; margin: 0; padding: 0; list-style: none; text-align: right; font-size: 22px; line-height: 1.05; }
-#team li.me { color: var(--yellow); }
-#team li.out { color: #8e8a7a; }
-#team .where { color: var(--dim); }
-#cross { position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px; background: rgba(255, 255, 255, 0.7); border-radius: 50%; }
-#prompt { position: absolute; left: 0; right: 0; top: 57%; text-align: center; font-size: 30px; }
-#subs { position: absolute; left: 0; right: 0; bottom: 120px; text-align: center; font-size: 28px; }
-#subs div { animation: fadeout 5s forwards; }
+#hud { position: fixed; inset: 0; pointer-events: none; font-size: 26px; letter-spacing: 1px; text-shadow: 0 0 6px rgba(0, 0, 0, 0.85); }
+#minimap { position: absolute; top: 20px; left: 20px; width: 180px; height: 206px; }
+#cross { position: absolute; left: 50%; top: 50%; width: 4px; height: 4px; margin: -2px; background: rgba(255, 255, 255, 0.6); border-radius: 50%; }
+#prompt { position: absolute; left: 0; right: 0; bottom: 18px; text-align: center; font-size: 22px; color: var(--dim); }
+#subs { position: absolute; left: 0; right: 0; bottom: 13%; text-align: center; font-size: 28px; }
+#subs div { animation: fadeout 4.5s forwards; }
 #subs b { color: var(--yellow); font-weight: normal; }
-#toasts { position: absolute; left: 0; right: 0; bottom: 200px; text-align: center; font-size: 24px; color: var(--ink); }
-#toasts div { animation: fadeout 4.5s forwards; }
 @keyframes fadeout { 0% { opacity: 0; } 6% { opacity: 1; } 80% { opacity: 1; } 100% { opacity: 0; } }
-#flash { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; font-size: 140px; color: var(--red); opacity: 0; }
-#flash.on { animation: flash 1.6s forwards; }
-@keyframes flash { 0% { opacity: 0; transform: scale(1.3); } 10% { opacity: 1; transform: scale(1); } 70% { opacity: 0.9; } 100% { opacity: 0; } }
-#banner { position: absolute; left: 0; right: 0; top: 24%; text-align: center; }
+#banner { position: absolute; left: 0; right: 0; top: 26%; text-align: center; }
 #banner h1 { margin: 0; font-size: 92px; font-weight: normal; letter-spacing: 6px; }
 #banner p { margin: 4px 0 0; font-size: 30px; color: var(--dim); }
-
-#meters { position: absolute; left: 30px; bottom: 70px; width: 240px; }
-.meter { margin-top: 6px; }
-.meter label { font-size: 20px; color: var(--dim); }
-.meter .bar { height: 10px; border: 1px solid rgba(243, 239, 217, 0.7); padding: 1px; }
-.meter .bar i { display: block; height: 100%; background: var(--ink); width: 100%; }
-#sanity .bar i { background: var(--yellow); }
-#sanity.low .bar i { background: var(--red); animation: blink 0.8s steps(1) infinite; }
-#almond { margin-top: 8px; font-size: 22px; }
-#flashicon { margin-top: 4px; font-size: 22px; color: var(--yellow); visibility: hidden; }
-#flashicon.on { visibility: visible; }
+#hud.cinematic #cross { display: none; }
+#hud.cinematic #prompt { left: auto; right: 24px; }
 
 /* -------------------------------------------------------------- screens -- */
 #screens { position: fixed; inset: 0; pointer-events: none; }
@@ -142,13 +106,6 @@ button.big { font-size: 40px; padding: 14px 16px; border-color: var(--yellow); b
 .slider input { padding: 0; accent-color: #c9b45f; }
 
 @media (max-width: 700px) {
-  #hud { font-size: 20px; }
-  .cam { font-size: 24px; }
-  #objective { font-size: 19px; top: 56px; left: 16px; max-width: 70vw; }
-  #minimap { top: 52px; left: 16px; width: 120px; height: 120px; }
-  #minimap:not([hidden]) ~ #objective { top: 180px; max-width: 45vw; font-size: 18px; }
-  #team { font-size: 18px; top: 56px; right: 16px; }
-  .cam.tl, .cam.bl { left: 16px; }
-  .cam.tr, .cam.br { right: 16px; }
-  #meters { left: 16px; width: 160px; }
+  #minimap { top: 12px; left: 12px; width: 130px; height: 149px; }
+  #banner h1 { font-size: 60px; }
 }

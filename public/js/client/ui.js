@@ -1,4 +1,6 @@
-// The camcorder HUD and the menu screens.
+// The in-game overlay and the menu screens. While you play, the only thing
+// on screen is the map (see minimap.js); words appear only in the opening
+// cutscene and when you're out of the game.
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
@@ -8,16 +10,6 @@ export class Hud {
   constructor() {
     this.root = $('hud');
     this.last = {};
-    const months = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-    const tick = () => {
-      const d = new Date();
-      const h = d.getHours(), pm = h >= 12;
-      const two = (n) => String(n).padStart(2, '0');
-      $('tc').textContent = `${pm ? 'PM' : 'AM'} ${two(h % 12 || 12)}:${two(d.getMinutes())}:${two(d.getSeconds())}`;
-      $('date').textContent = `${months[d.getMonth()]}. ${two(d.getDate())} 1996`;
-    };
-    tick();
-    setInterval(tick, 1000);
   }
 
   show() { this.root.hidden = false; this.banner(null); }
@@ -26,37 +18,16 @@ export class Hud {
   get mapCanvas() { return $('minimap'); }
   showMap(on) { $('minimap').hidden = !on; }
 
-  // cutscenes show only subtitles, the title card and the skip hint
+  // cutscenes get letterbox-style subtitles and a skip hint
   cinematic(on) { this.root.classList.toggle('cinematic', on); }
 
-  set(id, text) {
-    if (this.last[id] === text) return;
-    this.last[id] = text;
-    $(id).textContent = text || '';
+  prompt(text) {
+    if (this.last.prompt === text) return;
+    this.last.prompt = text;
+    $('prompt').textContent = text || '';
   }
 
-  objective(text) { this.set('objective', text); }
-  prompt(text) { this.set('prompt', text); }
-
-  bars(sanity, stamina) {
-    const s = $('sanity'), st = $('stamina');
-    s.hidden = sanity == null;
-    st.hidden = stamina == null;
-    if (sanity != null) {
-      s.querySelector('i').style.width = `${Math.round(sanity * 100)}%`;
-      s.classList.toggle('low', sanity < 0.3);
-    }
-    if (stamina != null) st.querySelector('i').style.width = `${Math.round(stamina * 100)}%`;
-  }
-
-  almond(n) { this.set('almond', n == null ? '' : `ALMOND WATER x${n}`); }
-  flashlight(on) { $('flashicon').classList.toggle('on', !!on); }
-
-  team(list) {
-    const html = list.map((p) => `<li class="${p.me ? 'me' : ''} ${p.out ? 'out' : ''}">${esc(p.name)}${p.bot ? ' (bot)' : ''} <span class="where">- ${esc(p.where)}</span></li>`).join('');
-    if (html !== this.last.team) { this.last.team = html; $('team').innerHTML = html; }
-  }
-
+  // a line of dialogue (cutscene only)
   say(name, text) {
     const d = document.createElement('div');
     d.innerHTML = `<b>${esc(name)}:</b> ${esc(text)}`;
@@ -66,40 +37,23 @@ export class Hud {
     setTimeout(() => d.remove(), 4500);
   }
 
-  toast(text) {
-    const d = document.createElement('div');
-    d.textContent = text;
-    const box = $('toasts');
-    box.appendChild(d);
-    while (box.children.length > 2) box.firstChild.remove();
-    setTimeout(() => d.remove(), 4500);
-  }
-
-  flash(text) {
-    const f = $('flash');
-    f.textContent = text;
-    f.classList.remove('on');
-    void f.offsetWidth;
-    f.classList.add('on');
-  }
-
-  banner(title, sub) {
+  // big title card; hides itself after `secs` if given
+  banner(title, sub, secs) {
     const b = $('banner');
+    clearTimeout(this.bannerTimer);
     b.hidden = !title;
-    if (title) {
-      b.querySelector('h1').textContent = title;
-      b.querySelector('p').textContent = sub || '';
-    }
+    if (!title) return;
+    b.querySelector('h1').textContent = title;
+    b.querySelector('p').textContent = sub || '';
+    if (secs) this.bannerTimer = setTimeout(() => { b.hidden = true; }, secs * 1000);
   }
 
   reset() {
     this.last = {};
     this.cinematic(false);
     this.showMap(false);
-    for (const id of ['objective', 'prompt', 'almond']) $(id).textContent = '';
+    $('prompt').textContent = '';
     $('subs').innerHTML = '';
-    $('toasts').innerHTML = '';
-    $('team').innerHTML = '';
     this.banner(null);
   }
 }

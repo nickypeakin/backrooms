@@ -80,7 +80,7 @@ export class StoreView {
     this.env = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
     pmrem.dispose();
     s.environment = this.env;
-    s.environmentIntensity = 0.55;
+    s.environmentIntensity = 0.85;
 
     const std = (o) => new THREE.MeshStandardMaterial(o);
     const W = SHOWROOM.x1 - SHOWROOM.x0, D = SHOWROOM.z1 - SHOWROOM.z0;
@@ -200,9 +200,9 @@ export class StoreView {
     s.add(puddle);
 
     // ------------------------------------------------------------- lights
-    s.add(new THREE.HemisphereLight(0xfffaf0, 0x8a7a66, 0.6));
+    s.add(new THREE.HemisphereLight(0xfffaf0, 0x8a7a66, 0.9));
     // nearly straight down from the ceiling grid: soft shadows under everything
-    const sun = new THREE.DirectionalLight(0xfff6e6, 1.3);
+    const sun = (this.sun = new THREE.DirectionalLight(0xfff6e6, 1.9));
     sun.position.set(1.5, 12, -2);
     sun.target.position.set(0, 0, -6);
     sun.castShadow = true;
@@ -220,11 +220,6 @@ export class StoreView {
         p.position.set(x, STORE_H - 0.01, z);
         s.add(p);
       }
-    }
-    for (const [x, z] of [[-7, 5], [7, 5], [-7, -5], [7, -5]]) {
-      const l = new THREE.PointLight(0xfff1dc, 9, 0, 2);
-      l.position.set(x, STORE_H - 0.3, z);
-      s.add(l);
     }
     // two tired fluorescent tubes in the hallway; the far one flickers
     for (const [z, flick] of [[-12.6, false], [-18.6, true]]) {

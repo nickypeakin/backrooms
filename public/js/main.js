@@ -58,31 +58,47 @@ let solo = false;
 let backTo = 'title';
 let paused = false;
 
-// Resolution adapts to the computer: if frames take too long the picture
-// renders at a lower resolution, and climbs back once there's headroom.
-// `?scale=0.5` fixes it (used by tests).
+// The picture adapts to the computer. If frames take too long it first
+// drops anti-aliasing, then shadows, and only then resolution (never below
+// 75%); it steps back up once there's headroom. `?scale=0.5` pins the
+// resolution (used by tests).
 const fixedScale = Number(params.get('scale')) || 0;
-let quality = fixedScale || 1;
-let frameAvg = 1 / 60, judgeT = 0, calmT = 0;
+const TIERS = [
+  { scale: 1, samples: 4, shadows: true },
+  { scale: 1, samples: 0, shadows: true },
+  { scale: 1, samples: 0, shadows: false },
+  { scale: 0.87, samples: 0, shadows: false },
+  { scale: 0.75, samples: 0, shadows: false },
+];
+let tier = 0;
+let frameAvg = 1 / 60, judgeT = 0, calmT = 0, warmT = 3;
+function applyTier() {
+  const T = TIERS[tier];
+  vhs.setSamples(T.samples);
+  vhs.shadows = T.shadows;
+  vhs.setSize(innerWidth, innerHeight, fixedScale || T.scale);
+}
 function adaptQuality(dt) {
-  if (fixedScale) return;
+  // ignore loading hitches and the first moments of a new scene
+  if (warmT > 0 || dt > 0.25) { warmT -= Math.min(dt, 0.1); return; }
   frameAvg += (dt - frameAvg) * 0.05;
   judgeT += dt;
   calmT += dt;
-  if (judgeT < 2) return;
+  if (judgeT < 1.5) return;
   judgeT = 0;
-  let next = quality;
-  if (frameAvg > 1 / 35 && quality > 0.5) { next = Math.max(0.5, quality - 0.15); calmT = 0; }
-  else if (frameAvg < 1 / 57 && quality < 1 && calmT > 8) next = Math.min(1, quality + 0.1);
-  if (next !== quality) {
-    quality = next;
-    vhs.setSize(innerWidth, innerHeight, quality);
+  let next = tier;
+  if (frameAvg > 1 / 40 && tier < TIERS.length - 1) { next = tier + 1; calmT = 0; frameAvg = 1 / 50; }
+  else if (frameAvg < 1 / 55 && tier > 0 && calmT > 10) { next = tier - 1; calmT = 0; }
+  if (next !== tier) {
+    tier = next;
+    applyTier();
   }
 }
+vhs.shadows = true;
 
 function resize() {
   const w = innerWidth, h = innerHeight;
-  vhs.setSize(w, h, quality);
+  vhs.setSize(w, h, fixedScale || TIERS[tier].scale);
   attract.resize(w, h);
   if (game) game.resize(w, h);
 }
@@ -236,6 +252,7 @@ function startGame(m) {
   hud.reset();
   game = new Game({ renderer, vhs, link, start: m, hud, input, settings });
   game.resize(innerWidth, innerHeight);
+  warmT = 3;
   setPaused(false);
   showScreen(null);
   input.lock();

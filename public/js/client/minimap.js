@@ -1,6 +1,9 @@
-// The map in the top-left corner. It only shows what you have actually seen
-// of Level 0, turns with you (straight ahead is always up), and marks your
-// teammates, almond water you've spotted and the exit once you've found it.
+// The map in the top-left corner, the only thing on screen while you play.
+// It shows just what you have seen of Level 0, turns with you (straight
+// ahead is always up), and marks your teammates, almond water you've spotted
+// and the exit once you've found it. The ring around it is your sanity, the
+// thin inner ring your stamina, and the bottles below are almond water
+// you're carrying.
 
 import { CELL } from '../shared/config.js';
 import { COLORS } from './ui.js';
@@ -47,10 +50,10 @@ export class Minimap {
     }
   }
 
-  draw({ x, z, ry, mates, taken }) {
+  draw({ x, z, ry, mates, taken, sanity = 1, stamina = 1, almond = 0, t = 0 }) {
     const L = this.level, n = L.n, ctx = this.ctx;
     const S = this.canvas.width, R = S / 2, k = R / RANGE;
-    ctx.clearRect(0, 0, S, S);
+    ctx.clearRect(0, 0, S, this.canvas.height);
     ctx.save();
     ctx.beginPath();
     ctx.arc(R, R, R - 2, 0, Math.PI * 2);
@@ -148,11 +151,38 @@ export class Minimap {
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillStyle = '#e2cf73';
-    ctx.fillText('N', R + Math.cos(na) * (R - 11), R + Math.sin(na) * (R - 11));
-    ctx.strokeStyle = 'rgba(226, 207, 115, 0.6)';
-    ctx.lineWidth = 2;
+    ctx.fillText('N', R + Math.cos(na) * (R - 14), R + Math.sin(na) * (R - 14));
+
+    // sanity: the rim, emptying clockwise; red and pulsing when it's low
+    ctx.lineCap = 'butt';
+    ctx.lineWidth = 5;
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.55)';
     ctx.beginPath();
-    ctx.arc(R, R, R - 2, 0, Math.PI * 2);
+    ctx.arc(R, R, R - 3, 0, Math.PI * 2);
     ctx.stroke();
+    const low = sanity < 0.3;
+    ctx.strokeStyle = low ? `rgba(255, 70, 50, ${0.6 + 0.4 * Math.abs(Math.sin(t * 5))})` : '#e2cf73';
+    ctx.beginPath();
+    ctx.arc(R, R, R - 3, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * Math.max(0.002, sanity));
+    ctx.stroke();
+    // stamina: a thin inner ring, only while it's not full
+    if (stamina < 0.99) {
+      ctx.lineWidth = 2;
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+      ctx.beginPath();
+      ctx.arc(R, R, R - 9, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * stamina);
+      ctx.stroke();
+    }
+
+    // almond water you're carrying
+    for (let i = 0; i < Math.min(almond, 6); i++) {
+      const bx = R - (Math.min(almond, 6) - 1) * 9 + i * 18, by = S + 4;
+      ctx.fillStyle = '#cfe8f2';
+      ctx.fillRect(bx - 4, by + 4, 8, 13);
+      ctx.fillRect(bx - 2, by, 4, 5);
+      ctx.fillStyle = '#6b8fb3';
+      ctx.fillRect(bx - 2, by - 1, 4, 2);
+      ctx.fillRect(bx - 4, by + 8, 8, 4);
+    }
   }
 }
